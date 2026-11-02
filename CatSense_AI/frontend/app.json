@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "CatSense AI",
+    "slug": "catsense-ai",
+    "version": "1.0.0",
+    "scheme": "catsense",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#130d34",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.catsense.ai"
+    },
+    "android": {
+      "package": "com.catsense.ai",
+      "backgroundColor": "#130d34"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CatSense AI needs your photos so you can add a picture of your cat."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
