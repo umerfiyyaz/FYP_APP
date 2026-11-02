@@ -4,6 +4,11 @@ export const spacing = {
   md: 16,
   lg: 24,
   xl: 32,
+  spaceXs: 4,
+  spaceSm: 8,
+  spaceMd: 16,
+  spaceLg: 24,
+  spaceXl: 32,
   gutter: 16,
   gutterSm: 12,
   margin: 20,
@@ -12,6 +17,7 @@ export const spacing = {
 
 export const radius = {
   sm: 8,
+  default: 16, // Tailwind "rounded-DEFAULT" / 1rem in prototype
   base: 16, // Tailwind "rounded-2xl" in the prototype = inset fields
   md: 24,
   lg: 32, // cards
@@ -27,6 +33,10 @@ export const shadows = {
   mintGlow: "0 0 16px rgba(86,221,171,0.35)",
   stepGlow: "0 0 8px rgba(255,176,32,0.4)",
   dotGlow: "0 0 6px rgba(86,221,171,0.6)",
+  glowAmber: "0 4px 16px rgba(255,176,32,0.45)",
+  glowMint: "0 0 16px rgba(86,221,171,0.6)",
+  elevationLow: "0 4px 16px rgba(13,7,47,0.3)",
+  elevationHigh: "0 12px 32px rgba(13,7,47,0.6)",
   sm: "0 1px 2px 0 rgba(0,0,0,0.05)",
   md: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)",
   lg: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",

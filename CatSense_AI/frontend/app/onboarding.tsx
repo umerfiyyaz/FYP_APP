@@ -51,7 +51,7 @@ export default function OnboardingScreen() {
   const [playing, setPlaying] = useState(false);
 
   // TODO: Skip behaviour to be confirmed. Continue goes to screen 4 (step 3 of 3) once it exists.
-  const goNext = () => router.replace("/(tabs)/home");
+  const goNext = () => router.push("/baseline");
 
   return (
     <Screen>

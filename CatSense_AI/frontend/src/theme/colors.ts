@@ -17,6 +17,7 @@ export const colors = {
 
   primary: "#ffd59b",
   primaryContainer: "#ffb020", // Cat Orange
+  primaryFixed: "#ffddb1",
   primaryFixedDim: "#ffba4b",
   surfaceTint: "#ffba4b",
   onPrimary: "#442b00",
@@ -25,13 +26,19 @@ export const colors = {
   secondary: "#56ddab", // Mint
   secondaryContainer: "#00aa7c",
   secondaryFixed: "#75fac6",
+  secondaryFixedDim: "#56ddab",
   onSecondary: "#003827",
+  onSecondaryContainer: "#003625",
 
   tertiary: "#ddd7ff", // Lavender
   tertiaryContainer: "#bfb8ff",
+  tertiaryFixed: "#e4dfff",
+  tertiaryFixedDim: "#c6bfff",
+  onTertiaryContainer: "#493ab2",
 
   error: "#ffb4ab",
   errorContainer: "#93000a",
+  onError: "#690005",
   onErrorContainer: "#ffdad6",
 
   white: "#ffffff",

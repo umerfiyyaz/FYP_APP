@@ -1,1 +1,13 @@
-{}
+
+{
+  "name": "catsense-app-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix CatSense_AI/frontend start",
+    "android": "npm --prefix CatSense_AI/frontend run android",
+    "ios": "npm --prefix CatSense_AI/frontend run ios",
+    "web": "npm --prefix CatSense_AI/frontend run web",
+    "typecheck": "npm --prefix CatSense_AI/frontend run typecheck"
+  }
+}

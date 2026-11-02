@@ -11,11 +11,14 @@ export const fonts = {
 
 // Same names and sizes as the prototype's Tailwind "fontSize" tokens.
 export const type = {
+  headlineXl: { fontFamily: fonts.extrabold, fontSize: 32, lineHeight: 40 },
   headlineXlMobile: {
     fontFamily: fonts.extrabold,
     fontSize: 26,
     lineHeight: 34,
   },
+  headlineLg: { fontFamily: fonts.bold, fontSize: 24, lineHeight: 32 },
+  headlineMd: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 28 },
   headlineSm: { fontFamily: fonts.semibold, fontSize: 18, lineHeight: 24 },
   bodyLg: { fontFamily: fonts.medium, fontSize: 16, lineHeight: 24 },
   bodyMd: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
