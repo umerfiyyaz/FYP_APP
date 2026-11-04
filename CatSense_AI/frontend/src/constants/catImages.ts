@@ -4,7 +4,13 @@ import type { ImageSourcePropType } from "react-native";
 // backend (photo_url) or from the image picker; these are only the demo cats.
 // Offline later: download each image into  frontend/assets/images/  and use require('...') instead of { uri }.
 export const catPhotos: Record<
-  "milo" | "miloCard" | "miloShelf" | "luna" | "oliver" | "allClear",
+  | "milo"
+  | "miloCard"
+  | "miloShelf"
+  | "luna"
+  | "oliver"
+  | "allClear"
+  | "sleepingKitten",
   ImageSourcePropType
 > = {
   // assets/images/milo.jpg
@@ -30,5 +36,9 @@ export const catPhotos: Record<
   // assets/images/allClear.jpg
   allClear: {
     uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuBab8OLZt107q9iSRiRwUAyfD53o3_2dknLsMsrM_V2KxX-HFwZsyAP_Vun-hKzbnIBAzU8qsy7Wi8I8Bi-iriqvvDqy397TJRVCuyV6MYl2ls7_Kv0hytzz131COaTaQVaFjDd23X1mYN9Cn8oZ_JcGYKbgR8dG0L3x_6iTcw9KzW1h-pMNbcQIgrpJvlcGHleJe-9qWZWM4k3iv7rQ-Sl_zHTwgBLbYxyhuRmpDB3",
+  },
+  // assets/images/sleepingKitten.jpg (History: empty state)
+  sleepingKitten: {
+    uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuB1iOjvPJ0C76-qgvep_3B-aJdHCIzR6g5X0oTxz7O5S8w_rG5tKc68ov845kdeBuDoJPYGLQiwFiJxZyRwVFDHUIkiJW-WRIuWqIYAZ-Ud6xAuJ18lul-JqeUx5HMW9SIMLP3mbk_yL-EozHV5zl_VtyZcVzNrNLLYomfXdRHGiGb5E3KSWvbPiylnf_Wp2TT7pUd4YpmQdUqRRFFK_kuS_A0BTJ6vMJsgkabeXr1t",
   },
 };

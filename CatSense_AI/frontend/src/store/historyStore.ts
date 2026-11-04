@@ -1,9 +1,13 @@
 import { useSyncExternalStore } from "react";
 
+import { USE_MOCK } from "@/services/api";
+import { historyApi, type HistoryDto } from "@/services/historyApi";
+
 // ---------------------------------------------------------------------------------------------
 // History store: tiny, dependency-free, fast (only components that read it re-render).
-// Today it holds MOCK data. When the FastAPI backend exists, replace `seed()` with a fetch and
-// make `add` / `remove` call the API (keep the same function names, the screens will not change).
+// Mock data while EXPO_PUBLIC_API_URL is empty. With a backend: hydrate(catId) loads the list from
+// GET /cats/{id}/analyses and remove() deletes with DELETE /analyses/{id} (after the Undo time ends).
+// The screens do not change, only this store talks to the network.
 // ---------------------------------------------------------------------------------------------
 
 export type ItemKind = "behavior" | "sound" | "alert";
@@ -27,12 +31,16 @@ export type HistoryItem = {
   title: string;
   subtitle: string;
   risk: number; // 0..100 AI health risk index
+  /** Video frame for the result card (from the backend); null = placeholder picture. */
+  thumbUrl?: string | null;
 };
 
 type State = {
   items: HistoryItem[];
   /** Last removed item (for the "Undo" toast). */
   lastRemoved: { item: HistoryItem; index: number } | null;
+  /** Cats whose list was loaded from the backend (so History does not flash "No analyses yet"). */
+  loaded: string[];
 };
 
 const MIN = 60_000;
@@ -123,7 +131,7 @@ function seed(): HistoryItem[] {
   ];
 }
 
-let state: State = { items: seed(), lastRemoved: null };
+let state: State = { items: seed(), lastRemoved: null, loaded: [] };
 const listeners = new Set<() => void>();
 
 function set(next: State) {
@@ -144,15 +152,64 @@ export function useHistory() {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+/** The removed result is deleted on the server only after the Undo time is over. */
+function commit() {
+  const r = state.lastRemoved;
+  if (r && !USE_MOCK) historyApi.remove(r.item.id).catch(() => {}); // offline: it returns on the next hydrate()
+}
+
+function toItem(d: HistoryDto): HistoryItem {
+  return {
+    id: d.id,
+    catId: d.cat_id,
+    createdAt: new Date(d.created_at).getTime(),
+    durationSec: d.duration_sec,
+    kind: d.kind,
+    behavior: d.behavior,
+    confidence: d.confidence,
+    mood: d.mood,
+    title: d.title,
+    subtitle: d.subtitle,
+    risk: d.risk,
+    thumbUrl: d.thumb_url,
+  };
+}
+
+/** true when this cat's list is ready to show (always true in mock mode). */
+export function useHistoryLoaded(catId: string | undefined) {
+  const s = useHistory();
+  return USE_MOCK || (catId !== undefined && s.loaded.includes(catId));
+}
+
 export const historyActions = {
-  /** Auto-save: call this when an analysis finishes (no "Save" button needed). */
+  /** Local add (demo). With the backend the analysis is saved by the server, then hydrate() shows it. */
   add(item: HistoryItem) {
     set({ ...state, items: [item, ...state.items] });
+  },
+  /** Loads the saved analyses of one cat from the backend (does nothing in mock mode). */
+  async hydrate(catId: string) {
+    if (USE_MOCK) return;
+    try {
+      const rows = (await historyApi.list(catId)).map(toItem);
+      const others = state.items.filter((i) => i.catId !== catId);
+      set({
+        ...state,
+        items: [...rows, ...others].sort((a, b) => b.createdAt - a.createdAt),
+        loaded: [...state.loaded.filter((c) => c !== catId), catId],
+      });
+    } catch {
+      set({
+        ...state,
+        loaded: [...state.loaded.filter((c) => c !== catId), catId],
+      }); // offline: show what we have
+    }
   },
   remove(id: string) {
     const index = state.items.findIndex((i) => i.id === id);
     if (index < 0) return;
+    commit(); // the previous removal can not be undone any more
     set({
+      ...state,
       items: state.items.filter((i) => i.id !== id),
       lastRemoved: { item: state.items[index], index },
     });
@@ -162,23 +219,29 @@ export const historyActions = {
     if (!r) return;
     const items = state.items.slice();
     items.splice(Math.min(r.index, items.length), 0, r.item);
-    set({ items, lastRemoved: null });
+    set({ ...state, items, lastRemoved: null });
   },
   clearUndo() {
-    if (state.lastRemoved) set({ ...state, lastRemoved: null });
+    if (!state.lastRemoved) return;
+    commit();
+    set({ ...state, lastRemoved: null });
   },
   /** Demo helper: empty the list to see the "No analyses yet" screen. */
   clearAll() {
-    set({ items: [], lastRemoved: null });
+    set({ ...state, items: [], lastRemoved: null });
   },
   resetDemo() {
-    set({ items: seed(), lastRemoved: null });
+    set({ ...state, items: seed(), lastRemoved: null });
   },
 };
 
 export function getItem(id: string | undefined) {
   return state.items.find((i) => i.id === id);
 }
+
+/** Only the results of one cat (the app always looks at the active cat). */
+export const itemsOf = (items: HistoryItem[], catId: string | undefined) =>
+  items.filter((i) => i.catId === catId);
 
 // ---- formatting helpers (shared by Home / History / Risk screens) ----------------------------
 
