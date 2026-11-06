@@ -1,4 +1,12 @@
+import uuid
+from datetime import datetime, timedelta, timezone
+
 import bcrypt
+import jwt
+
+from app.config import settings
+
+ALGORITHM = "HS256"
 
 
 def hash_password(password: str) -> str:
@@ -8,5 +16,19 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     try:
         return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
-    except ValueError:
+    except ValueError:  # e.g. password longer than bcrypt's 72-byte limit
         return False
+
+
+def create_access_token(user_id: uuid.UUID) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
+    return jwt.encode({"sub": str(user_id), "exp": expire}, settings.jwt_secret, algorithm=ALGORITHM)
+
+
+def decode_access_token(token: str) -> uuid.UUID | None:
+    """Return the user id inside a valid token, or None if it is invalid/expired."""
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
+        return uuid.UUID(payload["sub"])
+    except (jwt.PyJWTError, KeyError, ValueError):
+        return None

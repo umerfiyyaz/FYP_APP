@@ -1,19 +1,19 @@
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Numeric, String, func, text
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
-ENVIRONMENTS = ("indoor", "outdoor", "both")
+ENVIRONMENTS = ("Indoor", "Outdoor", "Both")
 
 
 class Cat(Base):
     __tablename__ = "cats"
     __table_args__ = (
-        CheckConstraint("environment IN ('indoor','outdoor','both')", name="environment"),
+        CheckConstraint("environment IN ('Indoor','Outdoor','Both')", name="environment"),
         Index("ix_cats_user_id", "user_id"),
     )
 
@@ -22,12 +22,9 @@ class Cat(Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(80))
-    breed: Mapped[str | None] = mapped_column(String(80))
-    birth_date: Mapped[date | None] = mapped_column(Date)
-    sex: Mapped[str | None] = mapped_column(String(10))
-    neutered: Mapped[bool | None]
-    weight_kg: Mapped[float | None] = mapped_column(Numeric(4, 1))
-    environment: Mapped[str] = mapped_column(String(10), default="indoor", server_default="indoor")
+    breed: Mapped[str] = mapped_column(String(80), default="Unknown", server_default="Unknown")
+    age_years: Mapped[float] = mapped_column(Float, default=0, server_default="0")
+    environment: Mapped[str] = mapped_column(String(7), default="Indoor", server_default="Indoor")
     photo_url: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

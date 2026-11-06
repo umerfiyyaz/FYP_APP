@@ -26,6 +26,7 @@ class Analysis(Base):
     status: Mapped[str] = mapped_column(String(12), default="queued", server_default="queued")
     progress: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     stage: Mapped[str | None] = mapped_column(String(40))
+    headline: Mapped[str | None] = mapped_column(String(80))  # short result text, e.g. "Calm & Content"
     model_versions: Mapped[dict | None] = mapped_column(JSONB)
     error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -42,4 +43,6 @@ class Analysis(Base):
     risk: Mapped["RiskScore | None"] = relationship(
         back_populates="analysis", cascade="all, delete-orphan", passive_deletes=True, uselist=False
     )
-    alerts: Mapped[list["Alert"]] = relationship(back_populates="analysis", passive_deletes=True)
+    alerts: Mapped[list["Alert"]] = relationship(
+        back_populates="analysis", cascade="all, delete-orphan", passive_deletes=True
+    )

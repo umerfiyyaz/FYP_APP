@@ -1,14 +1,14 @@
 """initial schema
 
-Revision ID: 99ffcb6189da
+Revision ID: 38b9dce82b1b
 Revises: 
-Create Date: 2026-11-05 17:19:49.375147
+Create Date: 2026-11-06 11:38:21.733314
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = '99ffcb6189da'
+revision = '38b9dce82b1b'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -29,16 +29,13 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('name', sa.String(length=80), nullable=False),
-    sa.Column('breed', sa.String(length=80), nullable=True),
-    sa.Column('birth_date', sa.Date(), nullable=True),
-    sa.Column('sex', sa.String(length=10), nullable=True),
-    sa.Column('neutered', sa.Boolean(), nullable=True),
-    sa.Column('weight_kg', sa.Numeric(precision=4, scale=1), nullable=True),
-    sa.Column('environment', sa.String(length=10), server_default='indoor', nullable=False),
+    sa.Column('breed', sa.String(length=80), server_default='Unknown', nullable=False),
+    sa.Column('age_years', sa.Float(), server_default='0', nullable=False),
+    sa.Column('environment', sa.String(length=7), server_default='Indoor', nullable=False),
     sa.Column('photo_url', sa.String(length=500), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.CheckConstraint("environment IN ('indoor','outdoor','both')", name=op.f('ck_cats_environment')),
+    sa.CheckConstraint("environment IN ('Indoor','Outdoor','Both')", name=op.f('ck_cats_environment')),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_cats_user_id_users'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_cats'))
     )
@@ -46,7 +43,6 @@ def upgrade() -> None:
     op.create_table('baselines',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('cat_id', sa.UUID(), nullable=False),
-    sa.Column('clips_count', sa.Integer(), server_default='0', nullable=False),
     sa.Column('metrics', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['cat_id'], ['cats.id'], name=op.f('fk_baselines_cat_id_cats'), ondelete='CASCADE'),
@@ -82,6 +78,7 @@ def upgrade() -> None:
     sa.Column('status', sa.String(length=12), server_default='queued', nullable=False),
     sa.Column('progress', sa.Integer(), server_default='0', nullable=False),
     sa.Column('stage', sa.String(length=40), nullable=True),
+    sa.Column('headline', sa.String(length=80), nullable=True),
     sa.Column('model_versions', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('error', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -96,15 +93,19 @@ def upgrade() -> None:
     op.create_table('alerts',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('cat_id', sa.UUID(), nullable=False),
-    sa.Column('analysis_id', sa.UUID(), nullable=True),
-    sa.Column('level', sa.String(length=6), nullable=False),
+    sa.Column('analysis_id', sa.UUID(), nullable=False),
+    sa.Column('level', sa.String(length=8), nullable=False),
     sa.Column('title', sa.String(length=160), nullable=False),
-    sa.Column('message', sa.Text(), nullable=True),
-    sa.Column('status', sa.String(length=10), server_default='new', nullable=False),
+    sa.Column('detail', sa.Text(), nullable=False),
+    sa.Column('emphasis', sa.String(length=160), nullable=True),
+    sa.Column('source', sa.String(length=40), nullable=False),
+    sa.Column('confidence', sa.Float(), nullable=True),
+    sa.Column('duration_sec', sa.Float(), nullable=True),
+    sa.Column('status', sa.String(length=12), server_default='open', nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.CheckConstraint("level IN ('Low','Medium','High')", name=op.f('ck_alerts_level')),
-    sa.CheckConstraint("status IN ('new','seen','resolved')", name=op.f('ck_alerts_status')),
-    sa.ForeignKeyConstraint(['analysis_id'], ['analyses.id'], name=op.f('fk_alerts_analysis_id_analyses'), ondelete='SET NULL'),
+    sa.CheckConstraint("level IN ('high','medium','advisory')", name=op.f('ck_alerts_level')),
+    sa.CheckConstraint("status IN ('open','resolved','dismissed','acknowledged')", name=op.f('ck_alerts_status')),
+    sa.ForeignKeyConstraint(['analysis_id'], ['analyses.id'], name=op.f('fk_alerts_analysis_id_analyses'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['cat_id'], ['cats.id'], name=op.f('fk_alerts_cat_id_cats'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_alerts'))
     )
