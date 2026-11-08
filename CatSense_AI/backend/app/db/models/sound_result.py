@@ -17,5 +17,6 @@ class SoundResult(Base):
     mood: Mapped[str] = mapped_column(String(30))  # label comes from the sound model, kept free-text on purpose
     confidence: Mapped[float | None] = mapped_column(Float)
     breakdown: Mapped[dict | None] = mapped_column(JSONB)  # e.g. {"Happy": 0.82, "Calm": 0.10}
+    waveform: Mapped[list | None] = mapped_column(JSONB)  # bar heights 0..100 for the sound screen
 
     analysis: Mapped["Analysis"] = relationship(back_populates="sound")

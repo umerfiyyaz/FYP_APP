@@ -8,5 +8,9 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me"
     jwt_expire_minutes: int = 60 * 24 * 7
 
+    # Uploaded videos are stored under this folder (relative to the backend folder).
+    media_dir: str = "storage"
+    max_upload_mb: int = 200
+
 
 settings = Settings()

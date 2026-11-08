@@ -1,4 +1,7 @@
 import uuid
+import shutil
+
+from app.services import storage_service
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -89,5 +92,7 @@ def update_cat(db: Session, cat: Cat, data: CatUpdate) -> Cat:
 
 
 def delete_cat(db: Session, cat: Cat) -> None:
+    cat_id = cat.id
     db.delete(cat)  # the database cascades to videos, analyses, alerts, ...
     db.commit()
+    shutil.rmtree(storage_service.media_root() / "videos" / str(cat_id), ignore_errors=True)
