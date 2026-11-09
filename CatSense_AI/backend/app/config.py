@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # Uploaded videos are stored under this folder (relative to the backend folder).
     media_dir: str = "storage"
     max_upload_mb: int = 200
+    max_clip_seconds: int = 60   # longest clip the user may keep after trimming
 
 
 settings = Settings()

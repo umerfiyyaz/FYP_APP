@@ -52,3 +52,20 @@ export async function api<T>(
     clearTimeout(timer);
   }
 }
+/** Upload a file (multipart). Do NOT set Content-Type: fetch adds it together with the boundary. */
+export async function apiUpload<T>(path: string, form: FormData, timeoutMs = 120000): Promise<T> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method: "POST",
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      body: form,
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
+  }
+}

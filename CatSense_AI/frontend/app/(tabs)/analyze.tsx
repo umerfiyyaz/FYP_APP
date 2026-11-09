@@ -1,5 +1,4 @@
 // SCREEN 6 - Analyze (prototype: 6_catsense_ai._analyze)
-import { useState } from "react";
 import {
   Alert,
   Image,
@@ -34,33 +33,31 @@ import {
 
 export default function AnalyzeScreen() {
   const router = useRouter();
-  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
-
   const pickVideo = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["videos"],
-        allowsEditing: true,
+        allowsEditing: false, // our own Trim screen does the cutting
         quality: 1,
       });
+      if (result.canceled || result.assets.length === 0) return;
 
-      if (!result.canceled && result.assets.length > 0) {
-        setSelectedVideo(result.assets[0].uri);
-        // Navigate to processing screen when ready
-        Alert.alert(
-          "Video Selected",
-          `Ready to analyze ${result.assets[0].fileName || "cat video"}.`,
-          [
-            {
-              text: "Start Analysis",
-              onPress: () => router.push("/processing"),
-            },
-            { text: "Cancel", style: "cancel" },
-          ],
-        );
-      }
+      const asset = result.assets[0];
+      router.push({
+        pathname: "/trim",
+        params: {
+          uri: asset.uri,
+          name: asset.fileName ?? "video.mp4",
+          mime: asset.mimeType ?? "video/mp4",
+          // picker gives milliseconds; the Trim screen wants seconds
+          duration: asset.duration ? String(asset.duration / 1000) : "",
+        },
+      });
     } catch (err) {
-      Alert.alert("Notice", "Unable to open gallery. Please check permissions.");
+      Alert.alert(
+        "Notice",
+        "Unable to open gallery. Please check permissions.",
+      );
     }
   };
 
@@ -147,7 +144,7 @@ export default function AnalyzeScreen() {
               OR DROP A CAT VIDEO HERE
             </Text>
             <Text style={[type.bodySm, styles.dropZoneDesc]}>
-              MP4, MOV or HEVC. About 30 seconds are analysed.
+              MP4 or MOV. You can trim it next (up to 60 seconds).
             </Text>
 
             {/* Spec watermark */}
@@ -266,23 +263,37 @@ export default function AnalyzeScreen() {
           <View style={styles.chipsWrap}>
             <View style={styles.behaviorChip}>
               <Icon name="restaurant" size={16} color={colors.primary} />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Eating</Text>
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Eating
+              </Text>
             </View>
             <View style={styles.behaviorChip}>
               <Icon name="auto-fix-high" size={16} color={colors.tertiary} />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Grooming</Text>
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Grooming
+              </Text>
             </View>
             <View style={styles.behaviorChip}>
               <Icon name="hotel" size={16} color={colors.secondary} />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Resting</Text>
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Resting
+              </Text>
             </View>
             <View style={styles.behaviorChip}>
-              <Icon name="directions-walk" size={16} color={colors.secondaryFixed} />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Moving</Text>
+              <Icon
+                name="directions-walk"
+                size={16}
+                color={colors.secondaryFixed}
+              />
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Moving
+              </Text>
             </View>
             <View style={styles.behaviorChip}>
               <Icon name="accessibility-new" size={16} color={colors.primary} />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Standing</Text>
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Standing
+              </Text>
             </View>
           </View>
         </View>
@@ -303,28 +314,50 @@ export default function AnalyzeScreen() {
 
           <View style={styles.chipsWrap}>
             <View style={styles.moodChip}>
-              <View style={[styles.moodDot, { backgroundColor: colors.secondary }]} />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Happy</Text>
-            </View>
-            <View style={styles.moodChip}>
-              <View style={[styles.moodDot, { backgroundColor: colors.tertiary }]} />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Resting</Text>
+              <View
+                style={[styles.moodDot, { backgroundColor: colors.secondary }]}
+              />
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Happy
+              </Text>
             </View>
             <View style={styles.moodChip}>
               <View
-                style={[styles.moodDot, { backgroundColor: colors.primaryContainer }]}
+                style={[styles.moodDot, { backgroundColor: colors.tertiary }]}
               />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Hungry</Text>
-            </View>
-            <View style={styles.moodChip}>
-              <View style={[styles.moodDot, { backgroundColor: colors.error }]} />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Defensive</Text>
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Resting
+              </Text>
             </View>
             <View style={styles.moodChip}>
               <View
-                style={[styles.moodDot, { backgroundColor: colors.secondaryFixed }]}
+                style={[
+                  styles.moodDot,
+                  { backgroundColor: colors.primaryContainer },
+                ]}
               />
-              <Text style={[type.labelMd, { color: colors.onSurface }]}>Purring</Text>
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Hungry
+              </Text>
+            </View>
+            <View style={styles.moodChip}>
+              <View
+                style={[styles.moodDot, { backgroundColor: colors.error }]}
+              />
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Defensive
+              </Text>
+            </View>
+            <View style={styles.moodChip}>
+              <View
+                style={[
+                  styles.moodDot,
+                  { backgroundColor: colors.secondaryFixed },
+                ]}
+              />
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                Purring
+              </Text>
             </View>
           </View>
         </View>
@@ -355,7 +388,8 @@ export default function AnalyzeScreen() {
                   Keep your cat centered
                 </Text>
                 <Text style={[type.bodySm, styles.tipDesc]}>
-                  Frame full feline body clearly in view to map body postures and tail motions.
+                  Frame full feline body clearly in view to map body postures
+                  and tail motions.
                 </Text>
               </View>
             </View>
@@ -370,7 +404,8 @@ export default function AnalyzeScreen() {
                   Use bright natural light
                 </Text>
                 <Text style={[type.bodySm, styles.tipDesc]}>
-                  Daylight helps the neural network register micro-expressions and ear twitches.
+                  Daylight helps the neural network register micro-expressions
+                  and ear twitches.
                 </Text>
               </View>
             </View>
@@ -389,7 +424,8 @@ export default function AnalyzeScreen() {
                   Hold the phone steady
                 </Text>
                 <Text style={[type.bodySm, styles.tipDesc]}>
-                  A stable shot preserves high temporal accuracy for frequency spectrogram analysis.
+                  A stable shot preserves high temporal accuracy for frequency
+                  spectrogram analysis.
                 </Text>
               </View>
             </View>
@@ -632,4 +668,3 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
-
