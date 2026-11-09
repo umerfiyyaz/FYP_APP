@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/Button";
 import { CommunityIcon, Icon } from "@/components/ui/Icon";
 import { Tag } from "@/components/ui/Tag";
 import { images } from "@/constants/images";
+import { riskTone } from "@/components/charts/RiskGauge";
 import { useRemoveFlow } from "@/features/history/useRemoveFlow";
+import { getCurrentUser } from "@/services/auth";
 import { useActiveCat } from "@/store/catStore";
 import {
   formatAgo,
@@ -29,8 +31,25 @@ import {
 } from "@/theme";
 import { go } from "@/utils/nav";
 
-const USER_NAME = "Alex"; // later: from the signed-in user
-const WEEK_MOCK = [0.35, 0.5, 0.42, 0.72, 1, 0.28, 0.22]; // later: from the backend
+const DAY = 24 * 60 * 60 * 1000;
+
+/** Number of analyses on each of the last 7 days (Monday = index 0 of the current week), scaled 0..1. */
+function weekBars(items: { createdAt: string | number | Date }[]) {
+  const now = new Date();
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  monday.setDate(monday.getDate() - ((now.getDay() + 6) % 7));
+  const counts = [0, 0, 0, 0, 0, 0, 0];
+  for (const it of items) {
+    const d = new Date(it.createdAt).getTime();
+    const idx = Math.floor((d - monday.getTime()) / DAY);
+    if (idx >= 0 && idx < 7) counts[idx] += 1;
+  }
+  const max = Math.max(1, ...counts);
+  return {
+    values: counts.map((c) => Math.max(c / max, 0.04)),
+    total: counts.reduce((a, b) => a + b, 0),
+  };
+}
 
 function greeting() {
   const h = new Date().getHours();
@@ -45,6 +64,11 @@ export function HomeDashboard() {
   const { items: all } = useHistory();
   const cat = useActiveCat();
   const CAT_NAME = cat?.name ?? "Milo";
+  const user = getCurrentUser();
+  const USER_NAME =
+    user?.full_name?.trim().split(" ")[0] ||
+    user?.email.split("@")[0] ||
+    "there";
   const items = useMemo(() => itemsOf(all, cat?.id), [all, cat?.id]);
   const latest = items[0];
 
@@ -54,6 +78,7 @@ export function HomeDashboard() {
   const { ask, overlay } = useRemoveFlow(CAT_NAME);
   const todayIdx = (new Date().getDay() + 6) % 7; // Monday = 0
   const hasAlert = items.some((i) => i.kind === "alert");
+  const week = useMemo(() => weekBars(items), [items]);
 
   if (!latest) return null;
   const isToday =
@@ -173,7 +198,11 @@ export function HomeDashboard() {
                   marginTop: 14,
                 }}
               >
-                {`${CAT_NAME} is ${latest.mood === "Defensive" ? "on guard" : "Calm & Content"}`}
+                {latest.risk >= 70
+                  ? `${CAT_NAME} needs a closer look`
+                  : latest.mood === "Defensive" || latest.risk >= 40
+                    ? `${CAT_NAME} is on guard`
+                    : `${CAT_NAME} looks calm`}
               </Text>
               <View
                 style={{
@@ -217,7 +246,7 @@ export function HomeDashboard() {
                 backgroundColor: withAlpha(colors.tertiaryContainer, 0.25),
               }}
             >
-              <Icon name="bedtime" size={16} color={colors.tertiary} />
+              <Icon name="pets" size={16} color={colors.tertiary} />
               <Text style={[type.labelLg, { color: colors.tertiary }]}>
                 {latest.behavior}
               </Text>
@@ -292,7 +321,7 @@ export function HomeDashboard() {
               style={{
                 ...type.headlineXlMobile,
                 fontSize: 24,
-                color: colors.secondary,
+                color: riskTone(latest.risk).color,
                 marginTop: 6,
               }}
             >
@@ -304,7 +333,7 @@ export function HomeDashboard() {
                 { color: colors.onSurfaceVariant, marginTop: 4 },
               ]}
             >
-              Behavior steady & calm
+              {`Score ${latest.risk}/100`}
             </Text>
           </PressScale>
           <View
@@ -393,7 +422,7 @@ export function HomeDashboard() {
                   { color: colors.onSurfaceVariant, marginTop: 2 },
                 ]}
               >
-                Daily comfort & interaction frequency
+                Analyses per day this week
               </Text>
             </View>
             <View
@@ -409,19 +438,19 @@ export function HomeDashboard() {
                 maxWidth: 140,
               }}
             >
-              <Icon name="trending-up" size={18} color={colors.secondary} />
+              <Icon name="videocam" size={18} color={colors.secondary} />
               <Text
                 style={[
                   type.labelMd,
                   { color: colors.secondary, flexShrink: 1 },
                 ]}
               >
-                {"+18% Feline engagement"}
+                {`${week.total} ${week.total === 1 ? "scan" : "scans"} this week`}
               </Text>
             </View>
           </View>
           <View style={{ marginTop: 18 }}>
-            <WeeklyBars values={WEEK_MOCK} active={todayIdx} />
+            <WeeklyBars values={week.values} active={todayIdx} />
           </View>
         </View>
 

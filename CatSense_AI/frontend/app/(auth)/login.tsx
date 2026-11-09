@@ -52,6 +52,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState(
     DEMO_PREFILL && USE_MOCK ? "Meow2024!cat" : "",
   );
+  const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -79,7 +80,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (mode === "register") {
-        await signUp(email.trim(), password);
+        await signUp(email.trim(), password, fullName.trim() || undefined);
         router.replace("/add-cat"); // new account -> onboarding step 1 (add your cat)
       } else {
         await signIn(email.trim(), password);
@@ -222,6 +223,32 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.form}>
+          {/* Name (sign up only) */}
+          {mode === "register" ? (
+            <View style={styles.fieldGroup}>
+              <View style={styles.labelRow}>
+                <Text
+                  style={[type.labelMd, { color: colors.onSurfaceVariant }]}
+                >
+                  Your name
+                </Text>
+              </View>
+              <InsetField
+                leftIcon="person"
+                iconGap={10}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="e.g. Umer"
+                placeholderTextColor={colors.surfaceContainerHighest}
+                autoCapitalize="words"
+                autoCorrect={false}
+                autoComplete="name"
+                textContentType="name"
+                maxLength={80}
+              />
+            </View>
+          ) : null}
+
           {/* Email */}
           <View style={styles.fieldGroup}>
             <View style={styles.labelRow}>
