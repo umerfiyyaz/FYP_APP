@@ -65,7 +65,10 @@ function seed(): Cat[] {
   ];
 }
 
-let state: State = { cats: seed(), activeId: "milo" };
+// Demo mode starts with sample cats; with a backend the list starts empty and is loaded after sign in.
+let state: State = USE_MOCK
+  ? { cats: seed(), activeId: "milo" }
+  : { cats: [], activeId: null };
 const listeners = new Set<() => void>();
 const set = (next: State) => {
   state = next;
@@ -119,6 +122,16 @@ export const catActions = {
   add(cat: Cat) {
     set({ cats: [...state.cats, cat], activeId: cat.id });
   },
+  /** A cat that the backend just created (POST /cats). The picked photo stays on this phone for now. */
+  addFromDto(dto: CatDto, photoUri?: string | null) {
+    const cat = toCat(dto);
+    if (photoUri) cat.photo = { uri: photoUri };
+    set({ cats: [...state.cats, cat], activeId: cat.id });
+  },
+  /** Sign out / switch account: forget every cat. */
+  clear() {
+    set({ cats: [], activeId: null });
+  },
   update(id: string, patch: Partial<Cat>) {
     const before = state.cats.find((c) => c.id === id);
     if (!before) return;
@@ -127,6 +140,12 @@ export const catActions = {
       cats: state.cats.map((c) => (c.id === id ? { ...c, ...patch } : c)),
     });
     if (USE_MOCK) return;
+    const serverChange =
+      patch.name !== undefined ||
+      patch.breed !== undefined ||
+      patch.ageYears !== undefined ||
+      patch.environment !== undefined;
+    if (!serverChange) return; // e.g. only the photo changed: nothing to send yet
     petsApi
       .updateCat(id, {
         name: patch.name,
@@ -154,7 +173,13 @@ export const catActions = {
   async hydrate() {
     if (USE_MOCK) return;
     try {
-      const cats = (await petsApi.listCats()).map(toCat);
+      const cats = (await petsApi.listCats()).map(toCat).map((c) => {
+        // keep a photo picked on this phone until photo upload exists on the server
+        const old = state.cats.find((o) => o.id === c.id);
+        return old && c.photo === images.mascot && old.photo !== images.mascot
+          ? { ...c, photo: old.photo }
+          : c;
+      });
       set({
         cats,
         activeId: cats.some((c) => c.id === state.activeId)

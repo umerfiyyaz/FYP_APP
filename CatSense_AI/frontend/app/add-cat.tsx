@@ -15,6 +15,10 @@ import { StepProgress } from "@/components/ui/ProgressBar";
 import { Screen } from "@/components/ui/Screen";
 import { DEMO_PREFILL, SHOW_EDIT_CARD_PREVIEW } from "@/constants/config";
 import { images } from "@/constants/images";
+import { USE_MOCK } from "@/services/api";
+import { errorMessage } from "@/services/auth";
+import { petsApi } from "@/services/petsApi";
+import { catActions } from "@/store/catStore";
 import {
   colors,
   gradients,
@@ -38,13 +42,26 @@ const ENVIRONMENTS: {
   { label: "Both", icon: "sync-alt" },
 ];
 
+/** "3 years" -> 3, "6 months" -> 0.5, "2.5" -> 2.5, anything without a number -> null */
+function parseAgeYears(text: string): number | null {
+  const m = text.replace(",", ".").match(/\d+(\.\d+)?/);
+  if (!m) return null;
+  const n = parseFloat(m[0]);
+  const years = /month|mo\b/i.test(text) ? n / 12 : n;
+  return Math.round(years * 100) / 100;
+}
+
 export default function AddCatScreen() {
   const router = useRouter();
-  const [name, setName] = useState(DEMO_PREFILL ? "Milo" : "");
-  const [age, setAge] = useState(DEMO_PREFILL ? "3 years" : "");
-  const [breed, setBreed] = useState(DEMO_PREFILL ? "Domestic Shorthair" : "");
+  const [name, setName] = useState(DEMO_PREFILL && USE_MOCK ? "Milo" : "");
+  const [age, setAge] = useState(DEMO_PREFILL && USE_MOCK ? "3 years" : "");
+  const [breed, setBreed] = useState(
+    DEMO_PREFILL && USE_MOCK ? "Domestic Shorthair" : "",
+  );
   const [environment, setEnvironment] = useState<Environment>("Indoor");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const canContinue = name.trim().length > 0;
   const catName = name.trim() || "your cat";
@@ -59,10 +76,36 @@ export default function AddCatScreen() {
     if (!result.canceled) setPhotoUri(result.assets[0].uri);
   };
 
-  const onContinue = () => {
-    if (!canContinue) return;
-    // TODO: save the cat (POST /cats) and keep it in the cat store.
-    router.push("/onboarding");
+  const onContinue = async () => {
+    if (!canContinue || saving) return;
+
+    // Demo mode (no backend configured): same as before.
+    if (USE_MOCK) {
+      router.push("/onboarding");
+      return;
+    }
+
+    const ageYears = parseAgeYears(age);
+    if (ageYears === null || ageYears > 40) {
+      setError("Enter your cat's age, for example 2 years or 6 months");
+      return;
+    }
+    setError("");
+    setSaving(true);
+    try {
+      const dto = await petsApi.createCat({
+        name: name.trim(),
+        breed: breed.trim() || "Unknown",
+        age_years: ageYears,
+        environment,
+      });
+      catActions.addFromDto(dto, photoUri);
+      router.push("/onboarding");
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const goHome = () => router.replace("/(tabs)/home"); // TODO: Skip behaviour to be confirmed
@@ -207,12 +250,23 @@ export default function AddCatScreen() {
             </Text>
           </View>
 
+          {!!error && (
+            <Text
+              style={[
+                type.bodySm,
+                { color: colors.error, textAlign: "center" },
+              ]}
+            >
+              {error}
+            </Text>
+          )}
+
           <Button
-            label="Continue"
+            label={saving ? "Saving..." : "Continue"}
             icon="arrow-forward"
             iconSize={18}
             onPress={onContinue}
-            disabled={!canContinue}
+            disabled={!canContinue || saving}
             gradient={gradients.ctaWarm}
             paddingVertical={16}
             style={{ marginTop: spacing.sm }}

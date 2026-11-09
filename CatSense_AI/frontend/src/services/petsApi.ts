@@ -1,9 +1,15 @@
 import { api } from "@/services/api";
-import type { AlertDto, AlertStatus, CatDto } from "@/types/pets";
+import type { AlertDto, AlertStatus, CatDto, Environment } from "@/types/pets";
 
 // Endpoints the FastAPI backend has to provide (the stores call these only when EXPO_PUBLIC_API_URL is set).
 export const petsApi = {
   listCats: () => api<CatDto[]>("/cats"),
+  createCat: (body: {
+    name: string;
+    breed: string;
+    age_years: number;
+    environment: Environment;
+  }) => api<CatDto>("/cats", { method: "POST", body }),
   updateCat: (
     id: string,
     patch: Partial<

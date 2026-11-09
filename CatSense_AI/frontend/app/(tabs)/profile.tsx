@@ -9,7 +9,7 @@ import { BrandHeader } from "@/components/ui/BrandHeader";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Icon, IconName } from "@/components/ui/Icon";
 import { Toast } from "@/components/ui/Toast";
-import { setAuthToken } from "@/services/api";
+import { getCurrentUser, signOut as clearSession } from "@/services/auth";
 import { openAlertsOf, useAlerts } from "@/store/alertStore";
 import { ageText, catActions, useActiveCat, useCats } from "@/store/catStore";
 import { inPeriod, useHistory } from "@/store/historyStore";
@@ -21,7 +21,10 @@ import { pickPhotoUri } from "@/utils/pickPhoto";
 // Screen 18 - Profile (+ log-out sheet). File: app/(tabs)/profile.tsx
 // ---------------------------------------------------------------------------------------------
 
-const OWNER = "Alex"; // later: from the signed-in user
+const ownerName = () => {
+  const u = getCurrentUser();
+  return u?.full_name || u?.email.split("@")[0] || "Alex"; // "Alex" only in demo mode
+};
 
 type RowProps = {
   icon: IconName;
@@ -135,9 +138,9 @@ export default function ProfileScreen() {
     const uri = await pickPhotoUri();
     if (uri) catActions.update(cat.id, { photo: { uri } });
   };
-  const signOut = () => {
+  const signOut = async () => {
     setSignOutOpen(false);
-    setAuthToken(null); // later: also clear the saved token / call /auth/logout
+    await clearSession(); // forgets the saved login (and the cats of this account)
     router.replace("/(auth)/login" as never);
   };
   const soon = () => setToast("Coming soon");
@@ -230,7 +233,7 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            {`${ageText(cat.ageYears)}, ${cat.breed} • Owner: ${OWNER}`}
+            {`${ageText(cat.ageYears)}, ${cat.breed} • Owner: ${ownerName()}`}
           </Text>
           <View
             style={{

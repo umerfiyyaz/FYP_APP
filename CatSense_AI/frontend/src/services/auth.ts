@@ -2,11 +2,16 @@
 import * as SecureStore from "expo-secure-store";
 
 import { api, ApiError, setAuthToken, USE_MOCK } from "@/services/api";
+import { catActions } from "@/store/catStore";
 
 const TOKEN_KEY = "catsense_token";
 
 export type AuthUser = { id: string; email: string; full_name: string | null };
 type TokenOut = { access_token: string; token_type: string; user: AuthUser };
+
+let currentUser: AuthUser | null = null;
+/** The signed-in user (null in demo mode or before sign in). */
+export const getCurrentUser = () => currentUser;
 
 // ---- token storage (never crashes the app if secure storage is not available) ----
 async function saveToken(token: string) {
@@ -43,6 +48,8 @@ export async function signUp(
   });
   setAuthToken(res.access_token);
   await saveToken(res.access_token);
+  currentUser = res.user;
+  catActions.clear(); // a new account has no cats yet
   return res.user;
 }
 
@@ -56,12 +63,17 @@ export async function signIn(
   });
   setAuthToken(res.access_token);
   await saveToken(res.access_token);
+  currentUser = res.user;
+  catActions.clear();
+  await catActions.hydrate(); // load this account's cats
   return res.user;
 }
 
 export async function signOut(): Promise<void> {
   setAuthToken(null);
+  currentUser = null;
   await clearToken();
+  if (!USE_MOCK) catActions.clear(); // demo mode keeps its sample cats
 }
 
 /** App start: if a saved token is still valid, return the user (null = show the login screen). */
@@ -71,7 +83,9 @@ export async function restoreSession(): Promise<AuthUser | null> {
   if (!token) return null;
   setAuthToken(token);
   try {
-    return await api<AuthUser>("/auth/me");
+    currentUser = await api<AuthUser>("/auth/me");
+    await catActions.hydrate();
+    return currentUser;
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {
       setAuthToken(null);
