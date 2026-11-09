@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { Glow } from "@/components/ui/Glow";
 import { Icon } from "@/components/ui/Icon";
 import { images } from "@/constants/images";
+import { USE_MOCK } from "@/services/api";
 import {
   colors,
   gradients,
@@ -62,6 +63,14 @@ export default function AnalyzeScreen() {
   };
 
   const recordLive = () => {
+    // The in-app camera is still a design preview, so with the real backend we do not open it.
+    if (!USE_MOCK) {
+      Alert.alert(
+        "Coming soon",
+        "Recording inside the app is not ready yet. Please choose a video from your gallery.",
+      );
+      return;
+    }
     router.push("/camera");
   };
 

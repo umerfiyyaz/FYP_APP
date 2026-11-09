@@ -37,31 +37,54 @@ export default function BehaviorTimelineScreen() {
 
   const [data, setData] = useState<BehaviorTimelineData | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [selectedEpochId, setSelectedEpochId] = useState<string>("ep_2");
+  const [selectedEpochId, setSelectedEpochId] = useState<string>("");
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    fetchBehaviorTimeline(id || "1409").then((res) => {
-      setData(res);
-      if (res.focusedEpochId) {
-        setSelectedEpochId(res.focusedEpochId);
-      }
-    });
+    fetchBehaviorTimeline(id || "1409")
+      .then((res) => {
+        setData(res);
+        if (res.focusedEpochId) {
+          setSelectedEpochId(res.focusedEpochId);
+        }
+      })
+      .catch(() => setFailed(true));
   }, [id]);
 
   if (!data) {
     return (
       <View style={[styles.container, styles.loadingCenter]}>
-        <Pulse>
-          <Text style={[type.labelLg, { color: colors.primary }]}>
-            Loading behavioral timeline...
-          </Text>
-        </Pulse>
+        {failed ? (
+          <Pressable onPress={() => router.back()}>
+            <Text style={[type.labelLg, { color: colors.error }]}>
+              Could not load the timeline. Tap to go back.
+            </Text>
+          </Pressable>
+        ) : (
+          <Pulse>
+            <Text style={[type.labelLg, { color: colors.primary }]}>
+              Loading behavioral timeline...
+            </Text>
+          </Pulse>
+        )}
       </View>
     );
   }
 
   const selectedEpoch =
-    data.epochs.find((ep) => ep.id === selectedEpochId) || data.epochs[1];
+    data.epochs.find((ep) => ep.id === selectedEpochId) || data.epochs[0];
+
+  if (!selectedEpoch) {
+    return (
+      <View style={[styles.container, styles.loadingCenter]}>
+        <Pressable onPress={() => router.back()}>
+          <Text style={[type.labelLg, { color: colors.onSurfaceVariant }]}>
+            No timeline for this clip. Tap to go back.
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -152,11 +175,7 @@ export default function BehaviorTimelineScreen() {
             {/* Live AI Detection Bounding Box Marker */}
             <View style={styles.detectionBox}>
               <View style={styles.detectionBadge}>
-                <Icon
-                  name="pets"
-                  size={11}
-                  color={colors.onPrimaryContainer}
-                />
+                <Icon name="pets" size={11} color={colors.onPrimaryContainer} />
                 <Text
                   style={[
                     type.labelSm,
@@ -186,14 +205,14 @@ export default function BehaviorTimelineScreen() {
             <View style={styles.hdBadge}>
               <View style={styles.redDot} />
               <Text style={[type.labelSm, { color: colors.onSurface }]}>
-                HD 1080p
+                Video clip
               </Text>
             </View>
 
             <View style={styles.poseTrackBadge}>
               <Icon name="adjust" size={13} color={colors.secondary} />
               <Text style={[type.labelSm, { color: colors.onSurface }]}>
-                PoseTrack v4.2
+                Behavior analysis
               </Text>
             </View>
           </ImageBackground>
@@ -206,7 +225,9 @@ export default function BehaviorTimelineScreen() {
                 <Text style={[type.labelMd, styles.timecodeNow]}>
                   {data.currentTimecode}
                 </Text>
-                <Text style={[type.labelSm, { color: colors.onSurfaceVariant }]}>
+                <Text
+                  style={[type.labelSm, { color: colors.onSurfaceVariant }]}
+                >
                   / 01:00
                 </Text>
               </View>
@@ -324,7 +345,9 @@ export default function BehaviorTimelineScreen() {
                   onPress={() => setSelectedEpochId(epoch.id)}
                   style={[
                     styles.epochItem,
-                    isSelected ? styles.epochItemActive : styles.epochItemInactive,
+                    isSelected
+                      ? styles.epochItemActive
+                      : styles.epochItemInactive,
                   ]}
                 >
                   <View style={styles.epochLeft}>
@@ -369,7 +392,10 @@ export default function BehaviorTimelineScreen() {
                       </View>
                       <Text
                         numberOfLines={1}
-                        style={[type.labelSm, { color: colors.onSurfaceVariant }]}
+                        style={[
+                          type.labelSm,
+                          { color: colors.onSurfaceVariant },
+                        ]}
                       >
                         {epoch.description}
                       </Text>
@@ -416,7 +442,7 @@ export default function BehaviorTimelineScreen() {
                     name={(selectedEpoch.icon as IconName) || "clean-hands"}
                     size={26}
                     color={
-                      selectedEpoch.id === "ep_2"
+                      selectedEpoch.behavior === "Grooming"
                         ? colors.onPrimaryContainer
                         : colors.onSurface
                     }
@@ -429,7 +455,9 @@ export default function BehaviorTimelineScreen() {
                   <Text style={[type.headlineSm, { color: colors.onSurface }]}>
                     {selectedEpoch.behavior}
                   </Text>
-                  <Text style={[type.labelMd, { color: colors.onSurfaceVariant }]}>
+                  <Text
+                    style={[type.labelMd, { color: colors.onSurfaceVariant }]}
+                  >
                     Duration: {selectedEpoch.durationText}
                   </Text>
                 </View>
@@ -437,7 +465,11 @@ export default function BehaviorTimelineScreen() {
 
               <View style={styles.detailRight}>
                 <View style={styles.confidenceBadge}>
-                  <Icon name="verified" size={13} color={colors.onSecondaryContainer} />
+                  <Icon
+                    name="verified"
+                    size={13}
+                    color={colors.onSecondaryContainer}
+                  />
                   <Text
                     style={[
                       type.labelMd,
@@ -460,19 +492,15 @@ export default function BehaviorTimelineScreen() {
                 <View key={idx} style={styles.tagItem}>
                   <Icon
                     name={
-                      idx === 0
-                        ? "spa"
-                        : idx === 1
-                        ? "favorite"
-                        : "graphic-eq"
+                      idx === 0 ? "spa" : idx === 1 ? "favorite" : "graphic-eq"
                     }
                     size={12}
                     color={
                       idx === 0
                         ? colors.primary
                         : idx === 1
-                        ? colors.secondary
-                        : colors.tertiary
+                          ? colors.secondary
+                          : colors.tertiary
                     }
                   />
                   <Text style={[type.labelSm, { color: colors.onSurface }]}>
@@ -528,10 +556,10 @@ export default function BehaviorTimelineScreen() {
                             item.name === "Grooming"
                               ? colors.primary
                               : item.name === "Resting"
-                              ? colors.tertiary
-                              : item.name === "Moving"
-                              ? colors.secondary
-                              : colors.onSurfaceVariant,
+                                ? colors.tertiary
+                                : item.name === "Moving"
+                                  ? colors.secondary
+                                  : colors.onSurfaceVariant,
                           fontWeight: item.seconds > 0 ? "700" : "400",
                         },
                       ]}

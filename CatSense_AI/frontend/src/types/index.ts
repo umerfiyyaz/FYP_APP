@@ -3,7 +3,12 @@
 
 export type RiskLevel = "Low" | "Medium" | "High";
 
-export type AllowedBehavior = "Resting" | "Grooming" | "Moving" | "Standing" | "Eating";
+export type AllowedBehavior =
+  | "Resting"
+  | "Grooming"
+  | "Moving"
+  | "Standing"
+  | "Eating";
 
 export interface AnalysisSummary {
   id: string;
@@ -38,7 +43,7 @@ export interface AnalysisSummary {
 }
 
 export interface TimelineSegment {
-  label: "Resting" | "Grooming" | "Uncertain" | "No Cat";
+  label: AllowedBehavior | "Uncertain" | "No Cat";
   percentage: number;
   color: string;
   timeRange: string;
@@ -116,4 +121,3 @@ export interface SoundMoodDetails {
   moodBreakdown: MoodBreakdownItem[];
   explanation: string;
 }
-

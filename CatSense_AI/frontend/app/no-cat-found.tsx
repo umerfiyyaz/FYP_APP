@@ -1,5 +1,12 @@
 // SCREEN 9 - No Cat Found (Incomplete Scan) (prototype: 9_catsense_ai_no_cat_found)
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -94,7 +101,11 @@ export default function NoCatFoundScreen() {
                 />
               </View>
               <View style={styles.statusFloatingBadge}>
-                <Icon name="search-off" size={20} color={colors.onErrorContainer} />
+                <Icon
+                  name="search-off"
+                  size={20}
+                  color={colors.onErrorContainer}
+                />
               </View>
             </View>
 
@@ -111,7 +122,8 @@ export default function NoCatFoundScreen() {
               We could not find a cat
             </Text>
             <Text style={[type.bodyMd, styles.heroSubtitle]}>
-              Our vision model couldn't pinpoint whiskers, ears, or feline motion. Try these quick tips and upload again.
+              Our vision model couldn't pinpoint whiskers, ears, or feline
+              motion. Try these quick tips and upload again.
             </Text>
 
             {/* Technical Metadata Pill Chip */}
@@ -120,7 +132,7 @@ export default function NoCatFoundScreen() {
                 <View style={styles.redDot} />
               </Pulse>
               <Text style={[type.labelSm, styles.metaText]}>
-                Clip ID: #CS-8291 • 0/150 keyframes feline
+                No cat was found in this video
               </Text>
             </View>
           </View>
@@ -130,7 +142,11 @@ export default function NoCatFoundScreen() {
         <View style={styles.checklistCard}>
           <View style={styles.checklistHeader}>
             <View style={styles.lightbulbCircle}>
-              <Icon name="lightbulb" size={18} color={colors.primaryContainer} />
+              <Icon
+                name="lightbulb"
+                size={18}
+                color={colors.primaryContainer}
+              />
             </View>
             <View>
               <Text style={[type.headlineSm, { color: colors.onSurface }]}>
@@ -154,7 +170,8 @@ export default function NoCatFoundScreen() {
                   Keep the cat clearly in view
                 </Text>
                 <Text style={[type.bodySm, styles.itemDesc]}>
-                  Ensure paws, ears, or tail aren't completely obscured by furniture.
+                  Ensure paws, ears, or tail aren't completely obscured by
+                  furniture.
                 </Text>
               </View>
             </View>
@@ -169,7 +186,8 @@ export default function NoCatFoundScreen() {
                   Use clear light, avoid backlight
                 </Text>
                 <Text style={[type.bodySm, styles.itemDesc]}>
-                  Direct soft light toward your cat rather than shooting directly into windows or dark corners.
+                  Direct soft light toward your cat rather than shooting
+                  directly into windows or dark corners.
                 </Text>
               </View>
             </View>
@@ -184,7 +202,8 @@ export default function NoCatFoundScreen() {
                   Keep the phone steady
                 </Text>
                 <Text style={[type.bodySm, styles.itemDesc]}>
-                  Rapid handheld shaking causes optical blur, degrading facial landmark tracking.
+                  Rapid handheld shaking causes optical blur, degrading facial
+                  landmark tracking.
                 </Text>
               </View>
             </View>
@@ -199,7 +218,8 @@ export default function NoCatFoundScreen() {
                   Clip should show cat for at least 5 seconds
                 </Text>
                 <Text style={[type.bodySm, styles.itemDesc]}>
-                  Continuous tracking is required to calculate cadence, purr acoustics, and tail tempo.
+                  Continuous tracking is required to calculate cadence, purr
+                  acoustics, and tail tempo.
                 </Text>
               </View>
             </View>
@@ -236,8 +256,7 @@ export default function NoCatFoundScreen() {
         <View style={styles.disclaimerRow}>
           <Icon name="info" size={16} color={colors.onSurfaceVariant} />
           <Text style={[type.bodySm, { color: colors.onSurfaceVariant }]}>
-            This video was not counted as healthy. It is marked{" "}
-            <Text style={{ color: colors.error, fontWeight: "600" }}>Failed</Text>.
+            This video was not analysed and was not saved to your history.
           </Text>
         </View>
       </ScrollView>
@@ -445,4 +464,3 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
 });
-

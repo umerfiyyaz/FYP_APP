@@ -20,10 +20,10 @@ import { Button } from "@/components/ui/Button";
 import { Glow } from "@/components/ui/Glow";
 import { Icon } from "@/components/ui/Icon";
 import { images } from "@/constants/images";
-import {
-  deleteAnalysisResult,
-  fetchAnalysisResult,
-} from "@/services/analysis";
+import { deleteAnalysisResult, fetchAnalysisResult } from "@/services/analysis";
+import { alertActions } from "@/store/alertStore";
+import { catActions } from "@/store/catStore";
+import { historyActions } from "@/store/historyStore";
 import { AnalysisSummary } from "@/types";
 import {
   colors,
@@ -45,29 +45,46 @@ export default function ResultsScreen() {
   const [data, setData] = useState<AnalysisSummary | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isPlayingClip, setIsPlayingClip] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    fetchAnalysisResult(id || "8492").then((res) => setData(res));
+    fetchAnalysisResult(id || "8492")
+      .then((res) => setData(res))
+      .catch(() => setFailed(true));
   }, [id]);
 
   if (!data) {
     return (
       <View style={[styles.container, styles.loadingCenter]}>
-        <Pulse>
-          <Text style={[type.labelLg, { color: colors.primary }]}>
-            Loading results...
-          </Text>
-        </Pulse>
+        {failed ? (
+          <Pressable onPress={() => router.back()}>
+            <Text style={[type.labelLg, { color: colors.error }]}>
+              Could not load this result. Tap to go back.
+            </Text>
+          </Pressable>
+        ) : (
+          <Pulse>
+            <Text style={[type.labelLg, { color: colors.primary }]}>
+              Loading results...
+            </Text>
+          </Pulse>
+        )}
       </View>
     );
   }
 
   const onViewTimeline = () => {
-    router.push("/behavior/1409");
+    router.push(`/behavior/${data.id}` as never);
   };
 
   const onConfirmDelete = async () => {
     await deleteAnalysisResult(data.id);
+    // refresh the lists (History, Home, cat card) from the backend; demo mode: nothing happens
+    await Promise.all([
+      historyActions.hydrate(data.catId),
+      catActions.hydrate(),
+      alertActions.hydrate(data.catId),
+    ]);
     setShowDeleteModal(false);
     router.replace("/(tabs)/home");
   };
@@ -223,7 +240,9 @@ export default function ResultsScreen() {
                 </Text>
               </View>
               <View style={styles.clipNumBadge}>
-                <Text style={[type.labelSm, { color: colors.onSurfaceVariant }]}>
+                <Text
+                  style={[type.labelSm, { color: colors.onSurfaceVariant }]}
+                >
                   {data.clipNumber}
                 </Text>
               </View>
@@ -359,7 +378,10 @@ export default function ResultsScreen() {
             <View style={[styles.metricRow, { opacity: 0.5 }]}>
               <View style={styles.metricLeft}>
                 <View
-                  style={[styles.metricDot, { backgroundColor: colors.outline }]}
+                  style={[
+                    styles.metricDot,
+                    { backgroundColor: colors.outline },
+                  ]}
                 />
                 <Text style={[type.bodyMd, { color: colors.onSurfaceVariant }]}>
                   Eating
@@ -373,7 +395,10 @@ export default function ResultsScreen() {
             <View style={[styles.metricRow, { opacity: 0.5 }]}>
               <View style={styles.metricLeft}>
                 <View
-                  style={[styles.metricDot, { backgroundColor: colors.outline }]}
+                  style={[
+                    styles.metricDot,
+                    { backgroundColor: colors.outline },
+                  ]}
                 />
                 <Text style={[type.bodyMd, { color: colors.onSurfaceVariant }]}>
                   Standing
@@ -388,7 +413,7 @@ export default function ResultsScreen() {
 
         {/* Sound Mood Card */}
         <Pressable
-          onPress={() => router.push("/sound/084")}
+          onPress={() => router.push(`/sound/${data.id}` as never)}
           accessibilityRole="button"
           accessibilityLabel="Inspect sound mood details"
           style={styles.cardSection}
@@ -438,7 +463,12 @@ export default function ResultsScreen() {
                 <Text style={[type.bodySm, { color: colors.onSurfaceVariant }]}>
                   {m.name}
                 </Text>
-                <Text style={[type.labelLg, { color: colors.primary, marginTop: 4 }]}>
+                <Text
+                  style={[
+                    type.labelLg,
+                    { color: colors.primary, marginTop: 4 },
+                  ]}
+                >
                   {m.percentage}%
                 </Text>
               </View>
@@ -464,7 +494,8 @@ export default function ResultsScreen() {
           <View style={styles.vetNoteBox}>
             <Icon name="info" size={18} color={colors.outline} />
             <Text style={[type.bodySm, { color: colors.outline, flex: 1 }]}>
-              An indication, not a medical diagnosis. Consult a licensed veterinarian for medical guidance.
+              An indication, not a medical diagnosis. Consult a licensed
+              veterinarian for medical guidance.
             </Text>
           </View>
         </View>
@@ -506,7 +537,10 @@ export default function ResultsScreen() {
           style={styles.modalBackdrop}
           onPress={() => setShowDeleteModal(false)}
         >
-          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable
+            style={styles.modalSheet}
+            onPress={(e) => e.stopPropagation()}
+          >
             <View style={styles.modalHandle} />
             <View style={styles.modalHeaderRow}>
               <View style={styles.modalIconCircle}>
@@ -539,7 +573,9 @@ export default function ResultsScreen() {
                 onPress={onConfirmDelete}
                 style={styles.removeConfirmBtn}
               >
-                <Text style={[type.labelLg, { color: colors.onErrorContainer }]}>
+                <Text
+                  style={[type.labelLg, { color: colors.onErrorContainer }]}
+                >
                   Remove
                 </Text>
               </PressScale>
@@ -964,4 +1000,3 @@ const styles = StyleSheet.create({
     boxShadow: "0 8px 20px rgba(255,180,171,0.35)",
   },
 });
-

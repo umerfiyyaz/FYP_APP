@@ -21,6 +21,9 @@ import {
   deleteAnalysisResult,
   fetchSoundMoodDetails,
 } from "@/services/analysis";
+import { alertActions } from "@/store/alertStore";
+import { catActions, useActiveCat } from "@/store/catStore";
+import { historyActions } from "@/store/historyStore";
 import { SoundMoodDetails } from "@/types";
 import {
   colors,
@@ -41,25 +44,45 @@ export default function SoundMoodScreen() {
   const [data, setData] = useState<SoundMoodDetails | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const cat = useActiveCat();
 
   useEffect(() => {
-    fetchSoundMoodDetails(id || "084").then((res) => setData(res));
+    fetchSoundMoodDetails(id || "084")
+      .then((res) => setData(res))
+      .catch(() => setFailed(true));
   }, [id]);
 
   if (!data) {
     return (
       <View style={[styles.container, styles.loadingCenter]}>
-        <Pulse>
-          <Text style={[type.labelLg, { color: colors.primary }]}>
-            Loading acoustic mood data...
-          </Text>
-        </Pulse>
+        {failed ? (
+          <Pressable onPress={() => router.back()}>
+            <Text style={[type.labelLg, { color: colors.error }]}>
+              Could not load the sound result. Tap to go back.
+            </Text>
+          </Pressable>
+        ) : (
+          <Pulse>
+            <Text style={[type.labelLg, { color: colors.primary }]}>
+              Loading acoustic mood data...
+            </Text>
+          </Pulse>
+        )}
       </View>
     );
   }
 
   const onConfirmDelete = async () => {
     await deleteAnalysisResult(data.clipId);
+    // refresh the lists from the backend; demo mode: nothing happens
+    if (cat) {
+      await Promise.all([
+        historyActions.hydrate(cat.id),
+        catActions.hydrate(),
+        alertActions.hydrate(cat.id),
+      ]);
+    }
     setShowDeleteModal(false);
     router.replace("/(tabs)/home");
   };
@@ -116,7 +139,7 @@ export default function SoundMoodScreen() {
           <View style={styles.clipIdentityGroup}>
             <Icon name="graphic-eq" size={18} color={colors.secondary} />
             <Text style={[type.headlineSm, { color: colors.onSurface }]}>
-              {data.catName} • Clip #{data.clipId}
+              {data.catName} • Clip #{data.clipId.slice(0, 4)}
             </Text>
           </View>
           <View style={styles.acousticModelPill}>
@@ -188,10 +211,7 @@ export default function SoundMoodScreen() {
                   ]}
                 >
                   <View
-                    style={[
-                      styles.chipDot,
-                      { backgroundColor: chip.color },
-                    ]}
+                    style={[styles.chipDot, { backgroundColor: chip.color }]}
                   />
                   <Text
                     style={[
@@ -200,8 +220,8 @@ export default function SoundMoodScreen() {
                         color: isFirst
                           ? colors.secondaryFixed
                           : chip.label === "Hungry"
-                          ? colors.primary
-                          : colors.tertiaryFixed,
+                            ? colors.primary
+                            : colors.tertiaryFixed,
                         fontWeight: isFirst ? "700" : "500",
                       },
                     ]}
@@ -256,7 +276,9 @@ export default function SoundMoodScreen() {
                   style={[
                     styles.audioBar,
                     {
-                      height: isPlaying ? Math.min(bar.height * 1.15, 76) : bar.height,
+                      height: isPlaying
+                        ? Math.min(bar.height * 1.15, 76)
+                        : bar.height,
                       backgroundColor: bar.color,
                     },
                     bar.isPeak && styles.peakBarGlow,
@@ -333,12 +355,12 @@ export default function SoundMoodScreen() {
                           isTop
                             ? colors.secondary
                             : item.name.includes("Resting")
-                            ? colors.tertiaryContainer
-                            : item.name.includes("Hungry")
-                            ? colors.primary
-                            : isZero
-                            ? withAlpha(colors.error, 0.6)
-                            : colors.outline
+                              ? colors.tertiaryContainer
+                              : item.name.includes("Hungry")
+                                ? colors.primary
+                                : isZero
+                                  ? withAlpha(colors.error, 0.6)
+                                  : colors.outline
                         }
                       />
                       <Text
@@ -361,10 +383,10 @@ export default function SoundMoodScreen() {
                           color: isTop
                             ? colors.secondary
                             : item.name.includes("Resting")
-                            ? colors.tertiaryFixed
-                            : item.name.includes("Hungry")
-                            ? colors.primary
-                            : colors.onSurfaceVariant,
+                              ? colors.tertiaryFixed
+                              : item.name.includes("Hungry")
+                                ? colors.primary
+                                : colors.onSurfaceVariant,
                           fontWeight: item.percentage > 0 ? "700" : "400",
                         },
                       ]}
@@ -397,7 +419,12 @@ export default function SoundMoodScreen() {
             <Icon name="lightbulb" size={22} color={colors.secondary} />
           </View>
           <View style={styles.whatThisMeansContent}>
-            <Text style={[type.headlineSm, { color: colors.onSurface, marginBottom: 4 }]}>
+            <Text
+              style={[
+                type.headlineSm,
+                { color: colors.onSurface, marginBottom: 4 },
+              ]}
+            >
               What this means
             </Text>
             <Text style={[type.bodyMd, styles.whatThisMeansText]}>
@@ -410,8 +437,11 @@ export default function SoundMoodScreen() {
         <View style={styles.notesContainer}>
           <View style={styles.noteLine}>
             <Icon name="info" size={16} color={colors.outline} />
-            <Text style={[type.bodySm, { color: colors.onSurfaceVariant, flex: 1 }]}>
-              If no usable cat sound is heard, we show 'No usable sound' instead of guessing.
+            <Text
+              style={[type.bodySm, { color: colors.onSurfaceVariant, flex: 1 }]}
+            >
+              If no usable cat sound is heard, we show 'No usable sound' instead
+              of guessing.
             </Text>
           </View>
           <View style={styles.noteLine}>
@@ -419,7 +449,11 @@ export default function SoundMoodScreen() {
             <Text
               style={[
                 type.labelSm,
-                { color: colors.onSurfaceVariant, fontStyle: "italic", flex: 1 },
+                {
+                  color: colors.onSurfaceVariant,
+                  fontStyle: "italic",
+                  flex: 1,
+                },
               ]}
             >
               An indication, not a medical diagnosis.
@@ -436,16 +470,16 @@ export default function SoundMoodScreen() {
             accessibilityLabel="Re-listen Sound Clip"
           >
             <LinearGradient
-              colors={[colors.primaryFixedDim, colors.primaryContainer, colors.surfaceTint]}
+              colors={[
+                colors.primaryFixedDim,
+                colors.primaryContainer,
+                colors.surfaceTint,
+              ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.primaryCta}
             >
-              <Icon
-                name="replay"
-                size={20}
-                color={colors.onPrimaryContainer}
-              />
+              <Icon name="replay" size={20} color={colors.onPrimaryContainer} />
               <Text style={[type.labelLg, styles.primaryCtaText]}>
                 Re-listen Sound Clip
               </Text>
@@ -460,7 +494,9 @@ export default function SoundMoodScreen() {
             style={styles.secondaryCta}
           >
             <Icon name="delete-outline" size={18} color={colors.error} />
-            <Text style={[type.labelLg, { color: colors.error, fontWeight: "700" }]}>
+            <Text
+              style={[type.labelLg, { color: colors.error, fontWeight: "700" }]}
+            >
               Remove from history
             </Text>
           </PressScale>
@@ -484,8 +520,8 @@ export default function SoundMoodScreen() {
                 Remove sound clip?
               </Text>
               <Text style={[type.bodyMd, styles.modalDescription]}>
-                This clip #{data.clipId} will be removed from {data.catName}'s acoustic history.
-                This action cannot be undone.
+                This clip #{data.clipId.slice(0, 4)} will be removed from{" "}
+                {data.catName}'s acoustic history. This action cannot be undone.
               </Text>
             </View>
 
@@ -503,7 +539,12 @@ export default function SoundMoodScreen() {
                 onPress={onConfirmDelete}
                 style={styles.modalDeleteBtn}
               >
-                <Text style={[type.labelLg, { color: colors.onError, fontWeight: "700" }]}>
+                <Text
+                  style={[
+                    type.labelLg,
+                    { color: colors.onError, fontWeight: "700" },
+                  ]}
+                >
                   Yes, Remove
                 </Text>
               </Pressable>

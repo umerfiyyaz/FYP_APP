@@ -1,5 +1,5 @@
 // SCREEN 8 - Processing / Neural Analysis Matrix (prototype: 8_catsense_ai._processing)
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -16,11 +16,21 @@ import Svg, { Circle } from "react-native-svg";
 
 import { PressScale } from "@/components/animations/PressScale";
 import { Pulse } from "@/components/animations/Pulse";
+import { Button } from "@/components/ui/Button";
 import { Glow } from "@/components/ui/Glow";
 import { Icon } from "@/components/ui/Icon";
 import { images } from "@/constants/images";
+import { api, USE_MOCK } from "@/services/api";
+import { errorMessage } from "@/services/auth";
+import { historyApi } from "@/services/historyApi";
+import { clearPendingUpload, getPendingUpload } from "@/services/pendingUpload";
+import { uploadVideo, type UploadResponse } from "@/services/videos";
+import { alertActions } from "@/store/alertStore";
+import { catActions, useActiveCat } from "@/store/catStore";
+import { historyActions } from "@/store/historyStore";
 import {
   colors,
+  gradients,
   letterSpacing,
   radius,
   shadows,
@@ -30,22 +40,177 @@ import {
   withAlpha,
 } from "@/theme";
 
-const MASCOT_PHRASES = [
-  "Checking Milo's movements...",
+const mascotPhrases = (name: string) => [
+  `Checking ${name}'s movements...`,
   "Analyzing tail twitch frequency...",
   "Measuring paw angle & posture...",
   "Listening for happy purr vibrations...",
 ];
 
+// The five steps the backend reports (stage names come from the server).
+const STEPS = [
+  {
+    key: "preparing",
+    title: "Preparing video",
+    sub: "Uploading and checking your clip",
+  },
+  {
+    key: "finding_cat",
+    title: "Finding your cat",
+    sub: "Looking for your cat in the frames",
+  },
+  {
+    key: "reading_behavior",
+    title: "Reading behavior",
+    sub: "Posture and movement",
+  },
+  {
+    key: "listening_sound",
+    title: "Listening to the sound",
+    sub: "Meows and purrs",
+  },
+  {
+    key: "health_report",
+    title: "Building health report",
+    sub: "Comparing with your cat's usual",
+  },
+] as const;
+
+/** Demo mode: pretend which step is active from the fake percent. */
+function stageFromPercent(p: number) {
+  if (p < 25) return "preparing";
+  if (p < 45) return "finding_cat";
+  if (p < 70) return "reading_behavior";
+  if (p < 90) return "listening_sound";
+  return "health_report";
+}
+
+type StepState = "done" | "running" | "waiting" | "queued";
+
+function StepRow({
+  state,
+  title,
+  sub,
+}: {
+  state: StepState;
+  title: string;
+  sub: string;
+}) {
+  if (state === "done") {
+    return (
+      <View style={styles.stepRowDone}>
+        <View style={styles.stepLeft}>
+          <View style={styles.doneIconCircle}>
+            <Icon name="check-circle" size={18} color={colors.secondary} />
+          </View>
+          <Text style={[type.bodyMd, { color: colors.onSurface }]}>
+            {title}
+          </Text>
+        </View>
+        <View style={styles.doneTag}>
+          <Text style={[type.labelSm, { color: colors.secondary }]}>Done</Text>
+        </View>
+      </View>
+    );
+  }
+  if (state === "running") {
+    return (
+      <View style={styles.stepRowRunning}>
+        <View style={styles.stepLeft}>
+          <View style={styles.runningIconCircle}>
+            <Pulse duration={1200}>
+              <Icon name="sync" size={18} color={colors.primaryContainer} />
+            </Pulse>
+          </View>
+          <View style={styles.runningTextCol}>
+            <Text
+              style={[
+                type.bodyMd,
+                { color: colors.primary, fontWeight: "600" },
+              ]}
+            >
+              {title}
+            </Text>
+            <Text style={[type.labelSm, { color: colors.primaryFixedDim }]}>
+              {sub}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.runningTag}>
+          <Text
+            style={[
+              type.labelSm,
+              { color: colors.onPrimary, fontWeight: "700" },
+            ]}
+          >
+            Running
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  if (state === "waiting") {
+    return (
+      <View style={styles.stepRowWaiting}>
+        <View style={styles.stepLeft}>
+          <View style={styles.waitingIconCircle}>
+            <Icon name="hourglass-top" size={16} color={colors.tertiary} />
+          </View>
+          <Text style={[type.bodyMd, { color: colors.onSurface }]}>
+            {title}
+          </Text>
+        </View>
+        <View style={styles.waitingTag}>
+          <Text style={[type.labelSm, { color: colors.onSurfaceVariant }]}>
+            Waiting
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.stepRowQueued}>
+      <View style={styles.stepLeft}>
+        <View style={styles.queuedIconCircle}>
+          <Icon
+            name="radio-button-unchecked"
+            size={16}
+            color={colors.onSurfaceVariant}
+          />
+        </View>
+        <Text style={[type.bodyMd, { color: colors.onSurfaceVariant }]}>
+          {title}
+        </Text>
+      </View>
+      <View style={styles.waitingTag}>
+        <Text style={[type.labelSm, { color: colors.onSurfaceVariant }]}>
+          Queued
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function ProcessingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [percent, setPercent] = useState(64);
+  const cat = useActiveCat();
+  const [percent, setPercent] = useState(USE_MOCK ? 64 : 3);
   const [phraseIdx, setPhraseIdx] = useState(0);
+  const [stage, setStage] = useState<string>("preparing");
+  const [failure, setFailure] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const analysisId = useRef<string | null>(null);
+  const userCancelled = useRef(false);
+  const job = useRef<{
+    attempt: number;
+    promise: Promise<UploadResponse>;
+  } | null>(null);
 
-  // Progressive simulation timer
+  // Progressive simulation timer (demo mode only)
   useEffect(() => {
+    if (!USE_MOCK) return;
     const timer = setInterval(() => {
       setPercent((prev) => {
         if (prev >= 98) {
@@ -54,7 +219,7 @@ export default function ProcessingScreen() {
         }
         const next = prev + 1;
         if (next % 6 === 0) {
-          setPhraseIdx((idx) => (idx + 1) % MASCOT_PHRASES.length);
+          setPhraseIdx((idx) => (idx + 1) % 4);
         }
         return next;
       });
@@ -63,15 +228,143 @@ export default function ProcessingScreen() {
     return () => clearInterval(timer);
   }, []);
 
+  // Real mode: upload the video, then ask the server for the progress until it is finished.
+  useEffect(() => {
+    if (USE_MOCK) return;
+    const pending = getPendingUpload();
+    if (!cat || !pending) {
+      setFailure(
+        "There is no video to analyse. Please choose a video from your gallery first.",
+      );
+      return;
+    }
+    const catId = cat.id;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setFailure(null);
+    setPercent(3);
+    setStage("preparing");
+
+    const finish = async (id: string) => {
+      await Promise.all([
+        historyActions.hydrate(catId),
+        catActions.hydrate(),
+        alertActions.hydrate(catId),
+      ]);
+      clearPendingUpload();
+      if (!cancelled) router.replace(`/results/${id}` as never);
+    };
+
+    const poll = async (id: string, errors: number) => {
+      if (cancelled) return;
+      try {
+        const s = await api<{
+          status: string;
+          progress: number;
+          stage: string | null;
+          error: string | null;
+        }>(`/analyses/${id}/status`);
+        if (cancelled) return;
+        setPercent(Math.max(8, Math.min(100, s.progress)));
+        if (s.stage) setStage(s.stage);
+        if (s.status === "done") {
+          finish(id);
+          return;
+        }
+        if (s.status === "no_cat") {
+          clearPendingUpload();
+          router.replace("/no-cat-found");
+          return;
+        }
+        if (s.status === "failed") {
+          setFailure(s.error ?? "The analysis failed. Please try again.");
+          return;
+        }
+        timer = setTimeout(() => poll(id, 0), 1500);
+      } catch {
+        if (cancelled) return;
+        if (errors >= 3) {
+          setFailure(
+            "Lost the connection to the server. Check your Wi-Fi and try again.",
+          );
+          return;
+        }
+        timer = setTimeout(() => poll(id, errors + 1), 2000);
+      }
+    };
+
+    // one upload per attempt (also when React runs this effect twice in development)
+    if (!job.current || job.current.attempt !== attempt) {
+      job.current = { attempt, promise: uploadVideo(catId, pending) };
+    }
+    job.current.promise
+      .then((up) => {
+        if (cancelled) {
+          // the user left while the video was uploading: remove what the server just created
+          if (userCancelled.current)
+            historyApi.remove(up.analysis_id).catch(() => {});
+          return;
+        }
+        analysisId.current = up.analysis_id;
+        setPercent(8);
+        poll(up.analysis_id, 0);
+      })
+      .catch((e) => {
+        if (!cancelled) setFailure(errorMessage(e));
+      });
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [attempt]);
+
+  // Real mode: rotate the mascot sentence every few seconds.
+  useEffect(() => {
+    if (USE_MOCK) return;
+    const t = setInterval(() => setPhraseIdx((i) => (i + 1) % 4), 4000);
+    return () => clearInterval(t);
+  }, []);
+
+  const pendingNow = getPendingUpload();
+  const clipSec = pendingNow
+    ? pendingNow.trimStart !== null && pendingNow.trimEnd !== null
+      ? pendingNow.trimEnd - pendingNow.trimStart
+      : pendingNow.durationSec
+    : 0;
+  const activeStage = USE_MOCK ? stageFromPercent(percent) : stage;
+  const activeIdx = Math.max(
+    0,
+    STEPS.findIndex((s) => s.key === activeStage),
+  );
+
   const totalCircumference = 440;
-  const strokeDashoffset = totalCircumference - (totalCircumference * percent) / 100;
-  const remainingSeconds = Math.max(2, Math.round(8 * (1 - (percent - 64) / 34)));
+  const strokeDashoffset =
+    totalCircumference - (totalCircumference * percent) / 100;
+  const remainingSeconds = Math.max(
+    2,
+    Math.round(8 * (1 - (percent - 64) / 34)),
+  );
 
   const onCancel = () => {
-    Alert.alert("Cancel Analysis", "Are you sure you want to cancel the analysis?", [
-      { text: "Continue Analysis", style: "cancel" },
-      { text: "Yes, Cancel", style: "destructive", onPress: () => router.back() },
-    ]);
+    Alert.alert(
+      "Cancel Analysis",
+      "Are you sure you want to cancel the analysis?",
+      [
+        { text: "Continue Analysis", style: "cancel" },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: () => {
+            userCancelled.current = true;
+            const id = analysisId.current;
+            if (!USE_MOCK && id) historyApi.remove(id).catch(() => {}); // stop it on the server too
+            clearPendingUpload();
+            router.back();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -175,27 +468,90 @@ export default function ProcessingScreen() {
                 <Pulse duration={1000} minOpacity={0.3}>
                   <View style={styles.activeDot} />
                 </Pulse>
-                <Text style={[type.labelSm, styles.aiActiveText]}>AI ACTIVE</Text>
+                <Text style={[type.labelSm, styles.aiActiveText]}>
+                  AI ACTIVE
+                </Text>
               </View>
             </View>
           </View>
 
           <Text style={[type.headlineSm, styles.timeLeftText]}>
-            About {remainingSeconds} seconds left
+            {USE_MOCK
+              ? `About ${remainingSeconds} seconds left`
+              : "Analysing your clip"}
           </Text>
           <Text style={[type.bodyMd, styles.gaugeSubtitle]}>
-            We analyse about 30 seconds of the best cat footage.
+            {USE_MOCK
+              ? "We analyse about 30 seconds of the best cat footage."
+              : "This can take a little while. You can keep this screen open."}
           </Text>
 
-          <View style={styles.analysedPill}>
-            <Icon name="timer" size={15} color={colors.secondary} />
-            <Text style={[type.labelMd, { color: colors.onSurface }]}>
-              Seconds analysed:{" "}
-              <Text style={{ color: colors.primary, fontWeight: "700" }}>30</Text>{" "}
-              of 48
-            </Text>
-          </View>
+          {USE_MOCK || clipSec > 0 ? (
+            <View style={styles.analysedPill}>
+              <Icon name="timer" size={15} color={colors.secondary} />
+              <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                {USE_MOCK ? (
+                  <>
+                    Seconds analysed:{" "}
+                    <Text style={{ color: colors.primary, fontWeight: "700" }}>
+                      30
+                    </Text>{" "}
+                    of 48
+                  </>
+                ) : (
+                  <>
+                    Clip length:{" "}
+                    <Text style={{ color: colors.primary, fontWeight: "700" }}>
+                      {Math.round(clipSec)} s
+                    </Text>
+                  </>
+                )}
+              </Text>
+            </View>
+          ) : null}
         </View>
+
+        {failure ? (
+          <View
+            style={{
+              borderRadius: radius.lg,
+              padding: spacing.md,
+              gap: spacing.sm,
+              backgroundColor: withAlpha(colors.errorContainer, 0.35),
+            }}
+          >
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              <Icon name="warning" size={18} color={colors.error} />
+              <Text style={[type.labelLg, { color: colors.error }]}>
+                Could not finish
+              </Text>
+            </View>
+            <Text style={[type.bodyMd, { color: colors.onSurface }]}>
+              {failure}
+            </Text>
+            {getPendingUpload() ? (
+              <Button
+                label="Try again"
+                icon="refresh"
+                iconPosition="left"
+                onPress={() => setAttempt((a) => a + 1)}
+                gradient={gradients.ctaFade}
+                paddingVertical={13}
+                shadow={shadows.cta}
+              />
+            ) : null}
+            <Button
+              label="Back"
+              onPress={() => router.back()}
+              color={colors.onSurface}
+              background={withAlpha(colors.surfaceContainerHigh, 0.8)}
+              paddingVertical={13}
+              shadow={shadows.md}
+            />
+          </View>
+        ) : null}
 
         {/* Neural Analysis Matrix Card */}
         <View style={styles.matrixCard}>
@@ -208,120 +564,33 @@ export default function ProcessingScreen() {
                 Neural Analysis Matrix
               </Text>
             </View>
-            <View style={styles.liveVersionBadge}>
-              <Text style={[type.labelSm, { color: colors.primary }]}>
-                v4.2 Live
-              </Text>
-            </View>
+            {USE_MOCK ? (
+              <View style={styles.liveVersionBadge}>
+                <Text style={[type.labelSm, { color: colors.primary }]}>
+                  v4.2 Live
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {/* Steps List */}
           <View style={styles.stepsList}>
-            {/* Step 1: Done */}
-            <View style={styles.stepRowDone}>
-              <View style={styles.stepLeft}>
-                <View style={styles.doneIconCircle}>
-                  <Icon name="check-circle" size={18} color={colors.secondary} />
-                </View>
-                <Text style={[type.bodyMd, { color: colors.onSurface }]}>
-                  Preparing video
-                </Text>
-              </View>
-              <View style={styles.doneTag}>
-                <Text style={[type.labelSm, { color: colors.secondary }]}>Done</Text>
-              </View>
-            </View>
-
-            {/* Step 2: Done */}
-            <View style={styles.stepRowDone}>
-              <View style={styles.stepLeft}>
-                <View style={styles.doneIconCircle}>
-                  <Icon name="check-circle" size={18} color={colors.secondary} />
-                </View>
-                <Text style={[type.bodyMd, { color: colors.onSurface }]}>
-                  Finding your cat
-                </Text>
-              </View>
-              <View style={styles.doneTag}>
-                <Text style={[type.labelSm, { color: colors.secondary }]}>Done</Text>
-              </View>
-            </View>
-
-            {/* Step 3: Running (Active) */}
-            <View style={styles.stepRowRunning}>
-              <View style={styles.stepLeft}>
-                <View style={styles.runningIconCircle}>
-                  <Pulse duration={1200}>
-                    <Icon
-                      name="sync"
-                      size={18}
-                      color={colors.primaryContainer}
-                    />
-                  </Pulse>
-                </View>
-                <View style={styles.runningTextCol}>
-                  <Text
-                    style={[
-                      type.bodyMd,
-                      { color: colors.primary, fontWeight: "600" },
-                    ]}
-                  >
-                    Reading behavior
-                  </Text>
-                  <Text style={[type.labelSm, { color: colors.primaryFixedDim }]}>
-                    Kinematic posture mapping
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.runningTag}>
-                <Text
-                  style={[
-                    type.labelSm,
-                    { color: colors.onPrimary, fontWeight: "700" },
-                  ]}
-                >
-                  Running
-                </Text>
-              </View>
-            </View>
-
-            {/* Step 4: Waiting */}
-            <View style={styles.stepRowWaiting}>
-              <View style={styles.stepLeft}>
-                <View style={styles.waitingIconCircle}>
-                  <Icon name="hourglass-top" size={16} color={colors.tertiary} />
-                </View>
-                <Text style={[type.bodyMd, { color: colors.onSurface }]}>
-                  Listening to the sound
-                </Text>
-              </View>
-              <View style={styles.waitingTag}>
-                <Text style={[type.labelSm, { color: colors.onSurfaceVariant }]}>
-                  Waiting
-                </Text>
-              </View>
-            </View>
-
-            {/* Step 5: Queued */}
-            <View style={styles.stepRowQueued}>
-              <View style={styles.stepLeft}>
-                <View style={styles.queuedIconCircle}>
-                  <Icon
-                    name="radio-button-unchecked"
-                    size={16}
-                    color={colors.onSurfaceVariant}
-                  />
-                </View>
-                <Text style={[type.bodyMd, { color: colors.onSurfaceVariant }]}>
-                  Building health report
-                </Text>
-              </View>
-              <View style={styles.waitingTag}>
-                <Text style={[type.labelSm, { color: colors.onSurfaceVariant }]}>
-                  Queued
-                </Text>
-              </View>
-            </View>
+            {STEPS.map((st, i) => (
+              <StepRow
+                key={st.key}
+                title={st.title}
+                sub={st.sub}
+                state={
+                  i < activeIdx
+                    ? "done"
+                    : i === activeIdx
+                      ? "running"
+                      : i === activeIdx + 1
+                        ? "waiting"
+                        : "queued"
+                }
+              />
+            ))}
 
             {/* Step 6: Saved to history */}
             <View style={styles.stepRowQueued}>
@@ -334,16 +603,25 @@ export default function ProcessingScreen() {
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[type.bodyMd, { color: colors.onSurfaceVariant }]}>
+                  <Text
+                    style={[type.bodyMd, { color: colors.onSurfaceVariant }]}
+                  >
                     Saved to history
                   </Text>
-                  <Text style={[type.labelSm, { color: withAlpha(colors.onSurfaceVariant, 0.8) }]}>
+                  <Text
+                    style={[
+                      type.labelSm,
+                      { color: withAlpha(colors.onSurfaceVariant, 0.8) },
+                    ]}
+                  >
                     When finished, automatically saved to history.
                   </Text>
                 </View>
               </View>
               <View style={styles.waitingTag}>
-                <Text style={[type.labelSm, { color: colors.onSurfaceVariant }]}>
+                <Text
+                  style={[type.labelSm, { color: colors.onSurfaceVariant }]}
+                >
                   Queued
                 </Text>
               </View>
@@ -367,11 +645,8 @@ export default function ProcessingScreen() {
               </Text>
               <View style={styles.mintDot} />
             </View>
-            <Text
-              numberOfLines={1}
-              style={[type.bodySm, styles.speechText]}
-            >
-              {MASCOT_PHRASES[phraseIdx]}
+            <Text numberOfLines={1} style={[type.bodySm, styles.speechText]}>
+              {mascotPhrases(cat?.name ?? "your cat")[phraseIdx % 4]}
             </Text>
           </View>
         </View>
@@ -385,7 +660,9 @@ export default function ProcessingScreen() {
             style={styles.cancelBtn}
           >
             <Icon name="close" size={18} color={colors.error} />
-            <Text style={[type.labelLg, { color: colors.onSurface }]}>Cancel</Text>
+            <Text style={[type.labelLg, { color: colors.onSurface }]}>
+              Cancel
+            </Text>
           </PressScale>
         </View>
       </ScrollView>
