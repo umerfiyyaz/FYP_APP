@@ -411,6 +411,35 @@ export default function ResultsScreen() {
           </View>
         </View>
 
+        {/* Health report: risk score and comparison with the cat's usual */}
+        <Pressable
+          onPress={() => router.push(`/health/${data.id}` as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Open health report"
+          style={styles.cardSection}
+        >
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.headerIconTitle}>
+              <Icon
+                name="check-circle-outline"
+                size={20}
+                color={colors.secondary}
+              />
+              <Text style={[type.headlineSm, { color: colors.onSurface }]}>
+                Health report
+              </Text>
+            </View>
+            <View style={styles.acousticPill}>
+              <Text style={[type.labelSm, { color: colors.secondary }]}>
+                Risk: {data.riskLevel}
+              </Text>
+            </View>
+          </View>
+          <Text style={[type.bodyMd, { color: colors.onSurfaceVariant }]}>
+            See the risk score and how today compares with your cat's usual.
+          </Text>
+        </Pressable>
+
         {/* Sound Mood Card */}
         <Pressable
           onPress={() => router.push(`/sound/${data.id}` as never)}
