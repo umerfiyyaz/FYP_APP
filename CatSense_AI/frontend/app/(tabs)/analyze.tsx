@@ -34,6 +34,20 @@ import {
 
 export default function AnalyzeScreen() {
   const router = useRouter();
+  // Send a picked or recorded video to the Trim screen.
+  const openTrim = (asset: ImagePicker.ImagePickerAsset) => {
+    router.push({
+      pathname: "/trim",
+      params: {
+        uri: asset.uri,
+        name: asset.fileName ?? "video.mp4",
+        mime: asset.mimeType ?? "video/mp4",
+        // picker gives milliseconds; the Trim screen wants seconds
+        duration: asset.duration ? String(asset.duration / 1000) : "",
+      },
+    });
+  };
+
   const pickVideo = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -42,18 +56,7 @@ export default function AnalyzeScreen() {
         quality: 1,
       });
       if (result.canceled || result.assets.length === 0) return;
-
-      const asset = result.assets[0];
-      router.push({
-        pathname: "/trim",
-        params: {
-          uri: asset.uri,
-          name: asset.fileName ?? "video.mp4",
-          mime: asset.mimeType ?? "video/mp4",
-          // picker gives milliseconds; the Trim screen wants seconds
-          duration: asset.duration ? String(asset.duration / 1000) : "",
-        },
-      });
+      openTrim(result.assets[0]);
     } catch (err) {
       Alert.alert(
         "Notice",
@@ -62,16 +65,32 @@ export default function AnalyzeScreen() {
     }
   };
 
-  const recordLive = () => {
-    // The in-app camera is still a design preview, so with the real backend we do not open it.
-    if (!USE_MOCK) {
-      Alert.alert(
-        "Coming soon",
-        "Recording inside the app is not ready yet. Please choose a video from your gallery.",
-      );
+  const recordLive = async () => {
+    // Demo mode keeps the old design preview screen.
+    if (USE_MOCK) {
+      router.push("/camera");
       return;
     }
-    router.push("/camera");
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          "Camera permission needed",
+          "Please allow camera access in your phone settings to record a video.",
+        );
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["videos"],
+        videoMaxDuration: 60, // same limit as the backend
+        allowsEditing: false,
+        quality: 1,
+      });
+      if (result.canceled || result.assets.length === 0) return;
+      openTrim(result.assets[0]);
+    } catch (err) {
+      Alert.alert("Notice", "Unable to open the camera. Please try again.");
+    }
   };
 
   return (
