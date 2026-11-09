@@ -12,6 +12,8 @@ import { InsetField } from "@/components/ui/Input";
 import { Screen } from "@/components/ui/Screen";
 import { DEMO_PREFILL } from "@/constants/config";
 import { images } from "@/constants/images";
+import { USE_MOCK } from "@/services/api";
+import { errorMessage, signIn, signUp } from "@/services/auth";
 import {
   colors,
   gradients,
@@ -45,25 +47,49 @@ export default function LoginScreen() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState(
-    DEMO_PREFILL ? "milo.guardian@whisker.ai" : "",
+    DEMO_PREFILL && USE_MOCK ? "milo.guardian@whisker.ai" : "",
   );
-  const [password, setPassword] = useState(DEMO_PREFILL ? "Meow2024!cat" : "");
+  const [password, setPassword] = useState(
+    DEMO_PREFILL && USE_MOCK ? "Meow2024!cat" : "",
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
 
   const strength = useMemo(() => passwordStrength(password), [password]);
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const passwordOk =
     password.length >= 8 && /[A-Za-z]/.test(password) && /\d/.test(password);
-  const showError = submitted && (!emailOk || !passwordOk);
+  const showError =
+    (submitted && (!emailOk || !passwordOk)) || serverError !== "";
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
+    if (loading) return;
     setSubmitted(true);
+    setServerError("");
     if (!emailOk || !passwordOk) return;
-    // TODO: call the backend (sign in or register) here.
-    // After a successful sign in with an existing account -> /(tabs)/home.
-    // For now every submit continues with onboarding step 1 (add your cat).
-    router.push("/add-cat");
+
+    // Demo mode (no backend configured): keep the old behaviour.
+    if (USE_MOCK) {
+      router.push("/add-cat");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (mode === "register") {
+        await signUp(email.trim(), password);
+        router.replace("/add-cat"); // new account -> onboarding step 1 (add your cat)
+      } else {
+        await signIn(email.trim(), password);
+        router.replace("/(tabs)/home");
+      }
+    } catch (e) {
+      setServerError(errorMessage(e));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -292,9 +318,11 @@ export default function LoginScreen() {
                     },
                   ]}
                 >
-                  {showError && !emailOk
-                    ? "Enter a valid e-mail address"
-                    : "Minimum 8 characters with letters & numbers"}
+                  {serverError
+                    ? serverError
+                    : showError && !emailOk
+                      ? "Enter a valid e-mail address"
+                      : "Minimum 8 characters with letters & numbers"}
                 </Text>
               </View>
               {!!strength && (
@@ -310,7 +338,13 @@ export default function LoginScreen() {
           {/* Buttons */}
           <View style={styles.buttons}>
             <Button
-              label={mode === "signin" ? "Sign in" : "Create free account"}
+              label={
+                loading
+                  ? "Please wait..."
+                  : mode === "signin"
+                    ? "Sign in"
+                    : "Create free account"
+              }
               icon="arrow-forward"
               onPress={onSubmit}
               gradient={gradients.ctaVertical}
@@ -352,7 +386,7 @@ export default function LoginScreen() {
           </Text>
         </View>
         <Text style={[type.bodySm, styles.footerText]}>
-          Private, on-device model processing for your feline's sanctuary.
+          A private account for your cat's health insights.
         </Text>
       </View>
     </Screen>

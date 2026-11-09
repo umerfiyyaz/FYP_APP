@@ -27,7 +27,8 @@
           "photosPermission": "CatSense AI needs your photos so you can add a picture of your cat."
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": false
