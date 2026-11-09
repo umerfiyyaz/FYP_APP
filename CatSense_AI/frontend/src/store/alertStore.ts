@@ -60,7 +60,7 @@ function seed(): PetAlert[] {
   ];
 }
 
-let state: State = { alerts: seed(), push: true, last: null };
+let state: State = { alerts: USE_MOCK ? seed() : [], push: true, last: null };
 const listeners = new Set<() => void>();
 const set = (next: State) => {
   state = next;
@@ -140,6 +140,10 @@ export const alertActions = {
     } catch {
       /* offline */
     }
+  },
+  /** Sign out / switch account: forget every alert. */
+  clear() {
+    set({ alerts: [], push: state.push, last: null });
   },
   resetDemo() {
     set({ alerts: seed(), push: state.push, last: null });

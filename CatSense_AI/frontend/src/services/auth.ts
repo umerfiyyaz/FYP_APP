@@ -2,7 +2,9 @@
 import * as SecureStore from "expo-secure-store";
 
 import { api, ApiError, setAuthToken, USE_MOCK } from "@/services/api";
+import { alertActions } from "@/store/alertStore";
 import { catActions } from "@/store/catStore";
+import { historyActions } from "@/store/historyStore";
 
 const TOKEN_KEY = "catsense_token";
 
@@ -10,6 +12,13 @@ export type AuthUser = { id: string; email: string; full_name: string | null };
 type TokenOut = { access_token: string; token_type: string; user: AuthUser };
 
 let currentUser: AuthUser | null = null;
+
+/** Forget the cats, results and alerts of the previous account. */
+function clearUserData() {
+  catActions.clear();
+  historyActions.clear();
+  alertActions.clear();
+}
 /** The signed-in user (null in demo mode or before sign in). */
 export const getCurrentUser = () => currentUser;
 
@@ -49,7 +58,7 @@ export async function signUp(
   setAuthToken(res.access_token);
   await saveToken(res.access_token);
   currentUser = res.user;
-  catActions.clear(); // a new account has no cats yet
+  clearUserData(); // a new account has nothing yet
   return res.user;
 }
 
@@ -64,8 +73,8 @@ export async function signIn(
   setAuthToken(res.access_token);
   await saveToken(res.access_token);
   currentUser = res.user;
-  catActions.clear();
-  await catActions.hydrate(); // load this account's cats
+  clearUserData();
+  await catActions.hydrate(); // load this account's cats (results and alerts load per cat)
   return res.user;
 }
 
@@ -73,7 +82,7 @@ export async function signOut(): Promise<void> {
   setAuthToken(null);
   currentUser = null;
   await clearToken();
-  if (!USE_MOCK) catActions.clear(); // demo mode keeps its sample cats
+  if (!USE_MOCK) clearUserData(); // demo mode keeps its sample data
 }
 
 /** App start: if a saved token is still valid, return the user (null = show the login screen). */

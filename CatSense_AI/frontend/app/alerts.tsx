@@ -8,6 +8,7 @@ import { Icon, IconName } from "@/components/ui/Icon";
 import { UndoToast } from "@/components/ui/UndoToast";
 import { catPhotos } from "@/constants/catImages";
 import { SHOW_DEMO_CONTROLS } from "@/constants/demo";
+import { USE_MOCK } from "@/services/api";
 import { alertActions, openAlertsOf, useAlerts } from "@/store/alertStore";
 import { useActiveCat } from "@/store/catStore";
 import { formatDuration, formatWhen } from "@/store/historyStore";
@@ -405,11 +406,14 @@ const AlertCard = memo(function AlertCard({ alert }: { alert: PetAlert }) {
 });
 
 function AllClear({ catName }: { catName: string }) {
-  const stats = [
-    { v: "98%", l: "Purr Index", c: colors.secondary },
-    { v: "14.1h", l: "Rest Time", c: colors.tertiary },
-    { v: "Normal", l: "Vocal Tone", c: colors.primaryFixedDim },
-  ];
+  // sample numbers only in demo mode (the backend does not produce these yet)
+  const stats = !USE_MOCK
+    ? []
+    : [
+        { v: "98%", l: "Purr Index", c: colors.secondary },
+        { v: "14.1h", l: "Rest Time", c: colors.tertiary },
+        { v: "Normal", l: "Vocal Tone", c: colors.primaryFixedDim },
+      ];
   return (
     <View style={[cardBase, { alignItems: "center", gap: 12 }]}>
       <Image
@@ -447,7 +451,9 @@ function AllClear({ catName }: { catName: string }) {
           { color: colors.onSurfaceVariant, textAlign: "center" },
         ]}
       >
-        {`No open alerts. Sound and video analysis show peaceful purring, regular active cycles and a stable baseline for ${catName}.`}
+        {USE_MOCK
+          ? `No open alerts. Sound and video analysis show peaceful purring, regular active cycles and a stable baseline for ${catName}.`
+          : `No open alerts for ${catName}. New alerts appear here when an analysis finds something unusual.`}
       </Text>
       <View
         style={{
@@ -494,7 +500,7 @@ export default function AlertsScreen() {
 
   useEffect(() => {
     if (cat) alertActions.hydrate(cat.id);
-  }, [cat]);
+  }, [cat?.id]);
 
   const open = useMemo(() => openAlertsOf(alerts, cat?.id), [alerts, cat?.id]);
   const data = useMemo(

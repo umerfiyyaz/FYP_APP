@@ -131,7 +131,12 @@ function seed(): HistoryItem[] {
   ];
 }
 
-let state: State = { items: seed(), lastRemoved: null, loaded: [] };
+// Demo mode starts with sample results; with a backend the list starts empty and is loaded per cat.
+let state: State = {
+  items: USE_MOCK ? seed() : [],
+  lastRemoved: null,
+  loaded: [],
+};
 const listeners = new Set<() => void>();
 
 function set(next: State) {
@@ -225,6 +230,10 @@ export const historyActions = {
     if (!state.lastRemoved) return;
     commit();
     set({ ...state, lastRemoved: null });
+  },
+  /** Sign out / switch account: forget everything that was loaded. */
+  clear() {
+    set({ items: [], lastRemoved: null, loaded: [] });
   },
   /** Demo helper: empty the list to see the "No analyses yet" screen. */
   clearAll() {
