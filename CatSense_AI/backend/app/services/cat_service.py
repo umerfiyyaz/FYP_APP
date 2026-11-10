@@ -1,13 +1,14 @@
-import uuid
 import shutil
+import uuid
+from pathlib import Path
 
-from app.services import storage_service
-
+from fastapi import UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Alert, Analysis, Cat, User
 from app.schemas.cat import CatCreate, CatOut, CatUpdate
+from app.services import storage_service
 
 BASELINE_TARGET = 3  # frontend: "3 = baseline complete"
 
@@ -53,10 +54,20 @@ def _summaries(db: Session, cat_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict]:
     return out
 
 
+def _photo_link(cat: Cat) -> str | None:
+    """The column keeps the file's path; the app gets a link to the (login-protected) photo endpoint.
+
+    The ?v= part changes with every new photo, so the phone never shows an old cached picture.
+    """
+    if not cat.photo_url:
+        return None
+    return f"/cats/{cat.id}/photo?v={Path(cat.photo_url).stem}"
+
+
 def to_out(cat: Cat, summary: dict) -> CatOut:
     return CatOut(
         id=cat.id, name=cat.name, breed=cat.breed, age_years=cat.age_years,
-        environment=cat.environment, photo_url=cat.photo_url, created_at=cat.created_at, **summary,
+        environment=cat.environment, photo_url=_photo_link(cat), created_at=cat.created_at, **summary,
     )
 
 
@@ -91,8 +102,29 @@ def update_cat(db: Session, cat: Cat, data: CatUpdate) -> Cat:
     return cat
 
 
+def set_photo(db: Session, cat: Cat, file: UploadFile) -> Cat:
+    new_path = storage_service.save_cat_photo(file, cat.id)
+    old_path = cat.photo_url
+    cat.photo_url = new_path
+    db.commit()
+    db.refresh(cat)
+    storage_service.delete_file(old_path)  # only after the new one is saved
+    return cat
+
+
+def clear_photo(db: Session, cat: Cat) -> Cat:
+    old_path = cat.photo_url
+    cat.photo_url = None
+    db.commit()
+    db.refresh(cat)
+    storage_service.delete_file(old_path)
+    return cat
+
+
 def delete_cat(db: Session, cat: Cat) -> None:
     cat_id = cat.id
     db.delete(cat)  # the database cascades to videos, analyses, alerts, ...
     db.commit()
-    shutil.rmtree(storage_service.media_root() / "videos" / str(cat_id), ignore_errors=True)
+    root = storage_service.media_root()
+    shutil.rmtree(root / "videos" / str(cat_id), ignore_errors=True)
+    shutil.rmtree(root / "photos" / str(cat_id), ignore_errors=True)
