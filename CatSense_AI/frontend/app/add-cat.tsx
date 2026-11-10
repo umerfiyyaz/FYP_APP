@@ -358,7 +358,7 @@ export default function AddCatScreen() {
       <View style={styles.footer}>
         <Icon name="lock" size={12} color={colors.onSurfaceVariant} />
         <Text style={[type.bodySm, { color: colors.onSurfaceVariant }]}>
-          Your cat's data stays private and encrypted.
+          Your cat's data is only visible to your account.
         </Text>
       </View>
     </Screen>
