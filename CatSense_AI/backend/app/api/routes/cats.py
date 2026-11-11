@@ -48,7 +48,7 @@ def delete_cat(cat_id: uuid.UUID, db: Session = Depends(get_db), user: User = De
 
 
 # ---- cat photo ----------------------------------------------------------------------------
-# photo_url in CatOut is a path like  /cats/<id>/photo?v=<token>  (the app adds the server address).
+# photo_url in CatOut is a path like  /cats/<id>/photo?v=...&t=<signed key>  (the app adds the server address).
 
 
 @router.post("/{cat_id}/photo", response_model=CatOut)
@@ -63,9 +63,12 @@ def upload_photo(
 
 
 @router.get("/{cat_id}/photo")
-def get_photo(cat_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    cat = _own_cat(db, user, cat_id)
-    if not cat.photo_url:
+def get_photo(cat_id: uuid.UUID, t: str = "", db: Session = Depends(get_db)):
+    # No login header here: the link itself carries a signed key (t=) made by cat_service._photo_link.
+    if not cat_service.photo_token_ok(cat_id, t):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This photo link is invalid or has expired")
+    cat = db.get(Cat, cat_id)
+    if cat is None or not cat.photo_url:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "This cat has no photo")
     path = storage_service.absolute_path(cat.photo_url)
     if not path.is_file():
@@ -73,7 +76,7 @@ def get_photo(cat_id: uuid.UUID, db: Session = Depends(get_db), user: User = Dep
     return FileResponse(
         path,
         media_type=storage_service.PHOTO_TYPES.get(path.suffix.lower(), "application/octet-stream"),
-        headers={"Cache-Control": "private, max-age=31536000, immutable"},  # the ?v= token changes with a new photo
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},  # ?v= changes with a new photo
     )
 
 

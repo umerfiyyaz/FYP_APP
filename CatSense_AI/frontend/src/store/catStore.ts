@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 import { catPhotos } from "@/constants/catImages";
 import { images } from "@/constants/images";
-import { USE_MOCK } from "@/services/api";
+import { imageSource, USE_MOCK } from "@/services/api";
 import { petsApi } from "@/services/petsApi";
 import type { Cat, CatDto } from "@/types/pets";
 
@@ -102,7 +102,7 @@ function toCat(d: CatDto): Cat {
     breed: d.breed,
     ageYears: d.age_years,
     environment: d.environment,
-    photo: d.photo_url ? { uri: d.photo_url } : images.mascot,
+    photo: imageSource(d.photo_url) ?? images.mascot,
     createdAt: new Date(d.created_at).getTime(),
     baselineVideos: d.baseline_videos,
     lastAnalysisAt: d.last_analysis_at
@@ -122,11 +122,33 @@ export const catActions = {
   add(cat: Cat) {
     set({ cats: [...state.cats, cat], activeId: cat.id });
   },
-  /** A cat that the backend just created (POST /cats). The picked photo stays on this phone for now. */
+  /** A cat that the backend just created (POST /cats). photoUri is only a fallback when the photo upload failed. */
   addFromDto(dto: CatDto, photoUri?: string | null) {
     const cat = toCat(dto);
     if (photoUri) cat.photo = { uri: photoUri };
     set({ cats: [...state.cats, cat], activeId: cat.id });
+  },
+  /**
+   * New profile photo: shown at once, then saved on the server.
+   * Returns false (and shows the old photo again) when the upload failed.
+   */
+  async setPhoto(id: string, uri: string): Promise<boolean> {
+    const before = state.cats.find((c) => c.id === id);
+    if (!before) return false;
+    const put = (photo: Cat["photo"]) =>
+      set({
+        ...state,
+        cats: state.cats.map((c) => (c.id === id ? { ...c, photo } : c)),
+      });
+    put({ uri });
+    if (USE_MOCK) return true;
+    try {
+      put(toCat(await petsApi.uploadPhoto(id, uri)).photo); // the saved picture from the server
+      return true;
+    } catch {
+      put(before.photo);
+      return false;
+    }
   },
   /** Sign out / switch account: forget every cat. */
   clear() {
@@ -173,13 +195,7 @@ export const catActions = {
   async hydrate() {
     if (USE_MOCK) return;
     try {
-      const cats = (await petsApi.listCats()).map(toCat).map((c) => {
-        // keep a photo picked on this phone until photo upload exists on the server
-        const old = state.cats.find((o) => o.id === c.id);
-        return old && c.photo === images.mascot && old.photo !== images.mascot
-          ? { ...c, photo: old.photo }
-          : c;
-      });
+      const cats = (await petsApi.listCats()).map(toCat);
       set({
         cats,
         activeId: cats.some((c) => c.id === state.activeId)

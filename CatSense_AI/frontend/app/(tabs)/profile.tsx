@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 
@@ -136,7 +136,14 @@ export default function ProfileScreen() {
 
   const changePhoto = async () => {
     const uri = await pickPhotoUri();
-    if (uri) catActions.update(cat.id, { photo: { uri } });
+    if (!uri) return;
+    const saved = await catActions.setPhoto(cat.id, uri);
+    if (!saved) {
+      Alert.alert(
+        "Photo not saved",
+        "We could not upload the photo. Check your connection and try again.",
+      );
+    }
   };
   const signOut = async () => {
     setSignOutOpen(false);

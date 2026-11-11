@@ -1,4 +1,6 @@
+import hmac
 import shutil
+import time
 import uuid
 from pathlib import Path
 
@@ -6,11 +8,13 @@ from fastapi import UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db.models import Alert, Analysis, Cat, User
 from app.schemas.cat import CatCreate, CatOut, CatUpdate
 from app.services import storage_service
 
 BASELINE_TARGET = 3  # frontend: "3 = baseline complete"
+PHOTO_LINK_DAYS = 30  # how long a photo link stays valid (the app gets a fresh one with every GET /cats)
 
 
 def _summaries(db: Session, cat_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict]:
@@ -54,14 +58,32 @@ def _summaries(db: Session, cat_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict]:
     return out
 
 
-def _photo_link(cat: Cat) -> str | None:
-    """The column keeps the file's path; the app gets a link to the (login-protected) photo endpoint.
+def _photo_signature(cat_id: uuid.UUID, exp: int) -> str:
+    msg = f"photo:{cat_id}:{exp}".encode()
+    return hmac.new(settings.jwt_secret.encode(), msg, "sha256").hexdigest()[:40]
 
-    The ?v= part changes with every new photo, so the phone never shows an old cached picture.
+
+def photo_token_ok(cat_id: uuid.UUID, token: str) -> bool:
+    """True when the token was made by this server for this cat's photo and has not expired."""
+    try:
+        exp_text, sig = token.split(".", 1)
+        exp = int(exp_text)
+    except ValueError:
+        return False
+    return exp > time.time() and hmac.compare_digest(sig, _photo_signature(cat_id, exp))
+
+
+def _photo_link(cat: Cat) -> str | None:
+    """The column keeps the file's path; the app gets a link to the photo endpoint.
+
+    The link carries a signed key (t=) for THIS cat only, because an Image cannot always send a
+    login header. ?v= changes with every new photo, so the phone never shows an old cached picture.
     """
     if not cat.photo_url:
         return None
-    return f"/cats/{cat.id}/photo?v={Path(cat.photo_url).stem}"
+    exp = int(time.time()) + PHOTO_LINK_DAYS * 86400
+    token = f"{exp}.{_photo_signature(cat.id, exp)}"
+    return f"/cats/{cat.id}/photo?v={Path(cat.photo_url).stem}&t={token}"
 
 
 def to_out(cat: Cat, summary: dict) -> CatOut:

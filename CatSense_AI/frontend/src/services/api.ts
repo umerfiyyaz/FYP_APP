@@ -15,6 +15,20 @@ export const setAuthToken = (t: string | null) => {
   authToken = t;
 };
 
+/**
+ * Image source for a picture that lives on the backend, e.g. "/cats/<id>/photo?v=...".
+ * The photo endpoint is login-protected, so the token travels with the request.
+ */
+export const imageSource = (path: string | null | undefined) =>
+  path
+    ? {
+        uri: /^https?:\/\//.test(path) ? path : `${BASE_URL}${path}`,
+        headers: authToken
+          ? { Authorization: `Bearer ${authToken}` }
+          : undefined,
+      }
+    : null;
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -53,7 +67,11 @@ export async function api<T>(
   }
 }
 /** Upload a file (multipart). Do NOT set Content-Type: fetch adds it together with the boundary. */
-export async function apiUpload<T>(path: string, form: FormData, timeoutMs = 120000): Promise<T> {
+export async function apiUpload<T>(
+  path: string,
+  form: FormData,
+  timeoutMs = 120000,
+): Promise<T> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {

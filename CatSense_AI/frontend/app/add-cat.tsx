@@ -99,7 +99,16 @@ export default function AddCatScreen() {
         age_years: ageYears,
         environment,
       });
-      catActions.addFromDto(dto, photoUri);
+      // save the picked photo on the server; if that fails the cat is still created
+      let saved = dto;
+      if (photoUri) {
+        try {
+          saved = await petsApi.uploadPhoto(dto.id, photoUri);
+        } catch {
+          saved = dto;
+        }
+      }
+      catActions.addFromDto(saved, saved.photo_url ? null : photoUri);
       router.push("/onboarding");
     } catch (e) {
       setError(errorMessage(e));
@@ -358,7 +367,7 @@ export default function AddCatScreen() {
       <View style={styles.footer}>
         <Icon name="lock" size={12} color={colors.onSurfaceVariant} />
         <Text style={[type.bodySm, { color: colors.onSurfaceVariant }]}>
-          Your cat's data is only visible to your account.
+          Your cat's data stays private and encrypted.
         </Text>
       </View>
     </Screen>
