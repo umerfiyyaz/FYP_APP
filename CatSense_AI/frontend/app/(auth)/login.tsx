@@ -12,7 +12,7 @@ import { InsetField } from "@/components/ui/Input";
 import { Screen } from "@/components/ui/Screen";
 import { DEMO_PREFILL } from "@/constants/config";
 import { images } from "@/constants/images";
-import { USE_MOCK } from "@/services/api";
+import { ApiError, USE_MOCK } from "@/services/api";
 import { errorMessage, signIn, signUp } from "@/services/auth";
 import {
   colors,
@@ -43,6 +43,77 @@ const STRENGTH_COLOR = {
   Strong: colors.secondary,
 } as const;
 
+type FieldErrors = {
+  name?: string;
+  email?: string;
+  password?: string;
+  form?: string;
+};
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Checks every field on the phone, so all the problems are shown together, each under its own field. */
+function checkFields(mode: Mode, email: string, password: string): FieldErrors {
+  const out: FieldErrors = {};
+  if (!email.trim()) out.email = "Enter your email address";
+  else if (!EMAIL_RE.test(email.trim()))
+    out.email = "Enter a valid email address";
+
+  if (!password) out.password = "Enter your password";
+  else if (mode === "register") {
+    if (password.length < 8)
+      out.password = "Password must contain at least 8 characters";
+    else if (!/[A-Za-z]/.test(password) || !/\d/.test(password))
+      out.password = "Password must contain both letters and numbers";
+  }
+  return out;
+}
+
+/** Turns the server's answer into one message per field (email problems under email, password under password). */
+function serverErrors(e: unknown): FieldErrors {
+  if (!(e instanceof ApiError)) return { form: errorMessage(e) };
+  let detail: unknown;
+  try {
+    detail = JSON.parse(e.message)?.detail;
+  } catch {
+    /* not JSON */
+  }
+  if (Array.isArray(detail)) {
+    const out: FieldErrors = {};
+    for (const d of detail) {
+      const loc = Array.isArray(d?.loc) ? d.loc : [];
+      const field = String(loc[loc.length - 1] ?? "");
+      const msg = String(d?.msg ?? "").replace(/^Value error,\s*/, "");
+      if (field === "email")
+        out.email = out.email ?? "Enter a valid email address";
+      else if (field === "password")
+        out.password = out.password ?? (msg || "This password is not valid");
+      else if (field === "full_name")
+        out.name = out.name ?? (msg || "This name is not valid");
+      else out.form = out.form ?? msg;
+    }
+    return Object.keys(out).length ? out : { form: errorMessage(e) };
+  }
+  if (typeof detail === "string") {
+    if (e.status === 409) return { email: detail }; // "An account with this email already exists"
+    if (e.status === 401) return { password: detail }; // "Incorrect email or password"
+    return { form: detail };
+  }
+  return { form: errorMessage(e) };
+}
+
+function FieldError({ text }: { text?: string }) {
+  if (!text) return null;
+  return (
+    <View style={[styles.hint, { marginTop: 6 }]}>
+      <Icon name="info-outline" size={13} color={colors.error} />
+      <Text style={[type.bodySm, styles.hintText, { color: colors.error }]}>
+        {text}
+      </Text>
+    </View>
+  );
+}
+
 export default function LoginScreen() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("signin");
@@ -54,22 +125,18 @@ export default function LoginScreen() {
   );
   const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [serverError, setServerError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const clear = (key: keyof FieldErrors) =>
+    setErrors((p) => ({ ...p, [key]: undefined, form: undefined }));
 
   const strength = useMemo(() => passwordStrength(password), [password]);
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const passwordOk =
-    password.length >= 8 && /[A-Za-z]/.test(password) && /\d/.test(password);
-  const showError =
-    (submitted && (!emailOk || !passwordOk)) || serverError !== "";
 
   const onSubmit = async () => {
     if (loading) return;
-    setSubmitted(true);
-    setServerError("");
-    if (!emailOk || !passwordOk) return;
+    const found = checkFields(mode, email, password);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return; // every problem is already shown under its field
 
     // Demo mode (no backend configured): keep the old behaviour.
     if (USE_MOCK) {
@@ -87,7 +154,7 @@ export default function LoginScreen() {
         router.replace("/(tabs)/home");
       }
     } catch (e) {
-      setServerError(errorMessage(e));
+      setErrors(serverErrors(e));
     } finally {
       setLoading(false);
     }
@@ -169,7 +236,10 @@ export default function LoginScreen() {
         {/* Sign in / Create account switch */}
         <View style={styles.switcher}>
           <Pressable
-            onPress={() => setMode("signin")}
+            onPress={() => {
+              setMode("signin");
+              setErrors({});
+            }}
             style={[styles.tab, mode === "signin" && styles.tabActive]}
             accessibilityRole="button"
           >
@@ -195,7 +265,10 @@ export default function LoginScreen() {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => setMode("register")}
+            onPress={() => {
+              setMode("register");
+              setErrors({});
+            }}
             style={[styles.tab, mode === "register" && styles.tabActive]}
             accessibilityRole="button"
           >
@@ -237,7 +310,10 @@ export default function LoginScreen() {
                 leftIcon="person"
                 iconGap={10}
                 value={fullName}
-                onChangeText={setFullName}
+                onChangeText={(v) => {
+                  setFullName(v);
+                  clear("name");
+                }}
                 placeholder="e.g. Umer"
                 placeholderTextColor={colors.surfaceContainerHighest}
                 autoCapitalize="words"
@@ -246,6 +322,7 @@ export default function LoginScreen() {
                 textContentType="name"
                 maxLength={80}
               />
+              <FieldError text={errors.name} />
             </View>
           ) : null}
 
@@ -266,7 +343,10 @@ export default function LoginScreen() {
               leftIcon="alternate-email"
               iconGap={10}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(v) => {
+                setEmail(v);
+                clear("email");
+              }}
               placeholder="you@email.com"
               placeholderTextColor={colors.surfaceContainerHighest}
               keyboardType="email-address"
@@ -275,6 +355,7 @@ export default function LoginScreen() {
               autoComplete="email"
               textContentType="emailAddress"
             />
+            <FieldError text={errors.email} />
           </View>
 
           {/* Password */}
@@ -295,7 +376,10 @@ export default function LoginScreen() {
               leftIcon="lock"
               iconGap={10}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(v) => {
+                setPassword(v);
+                clear("password");
+              }}
               placeholder="Enter password"
               secureTextEntry={!showPassword}
               autoCapitalize="none"
@@ -327,40 +411,34 @@ export default function LoginScreen() {
                 </Pressable>
               }
             />
-            <View style={styles.hintRow}>
-              <View style={styles.hint}>
-                <Icon
-                  name="info-outline"
-                  size={13}
-                  color={showError ? colors.error : colors.outline}
-                />
-                <Text
-                  style={[
-                    type.bodySm,
-                    styles.hintText,
-                    {
-                      color: showError
-                        ? colors.error
-                        : withAlpha(colors.onSurfaceVariant, 0.8),
-                    },
-                  ]}
-                >
-                  {serverError
-                    ? serverError
-                    : showError && !emailOk
-                      ? "Enter a valid e-mail address"
-                      : "Minimum 8 characters with letters & numbers"}
-                </Text>
+            {errors.password ? (
+              <FieldError text={errors.password} />
+            ) : mode === "register" ? (
+              <View style={styles.hintRow}>
+                <View style={styles.hint}>
+                  <Icon name="info-outline" size={13} color={colors.outline} />
+                  <Text
+                    style={[
+                      type.bodySm,
+                      styles.hintText,
+                      { color: withAlpha(colors.onSurfaceVariant, 0.8) },
+                    ]}
+                  >
+                    Minimum 8 characters with letters & numbers
+                  </Text>
+                </View>
+                {!!strength && (
+                  <Text
+                    style={[type.labelSm, { color: STRENGTH_COLOR[strength] }]}
+                  >
+                    {strength}
+                  </Text>
+                )}
               </View>
-              {!!strength && (
-                <Text
-                  style={[type.labelSm, { color: STRENGTH_COLOR[strength] }]}
-                >
-                  {strength}
-                </Text>
-              )}
-            </View>
+            ) : null}
           </View>
+
+          <FieldError text={errors.form} />
 
           {/* Buttons */}
           <View style={styles.buttons}>
