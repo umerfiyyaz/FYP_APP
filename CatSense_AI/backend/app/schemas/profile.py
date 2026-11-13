@@ -13,3 +13,9 @@ class UserUpdate(BaseModel):
         if not v:
             raise ValueError("Name cannot be empty")
         return v
+
+
+class EmailCheckIn(BaseModel):
+    """POST /auth/check-email body: lets the sign-up screen report "email already taken" together with the other errors."""
+
+    email: str = Field(max_length=254)

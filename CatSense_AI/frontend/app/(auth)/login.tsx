@@ -13,7 +13,7 @@ import { Screen } from "@/components/ui/Screen";
 import { DEMO_PREFILL } from "@/constants/config";
 import { images } from "@/constants/images";
 import { ApiError, USE_MOCK } from "@/services/api";
-import { errorMessage, signIn, signUp } from "@/services/auth";
+import { errorMessage, isEmailTaken, signIn, signUp } from "@/services/auth";
 import {
   colors,
   gradients,
@@ -135,6 +135,21 @@ export default function LoginScreen() {
   const onSubmit = async () => {
     if (loading) return;
     const found = checkFields(mode, email, password);
+
+    // Sign up: also ask the server whether the email is taken, so that "already exists" and the
+    // password problems appear together after ONE press. If the server cannot be reached, skip this check.
+    if (mode === "register" && !USE_MOCK && !found.email) {
+      setLoading(true);
+      try {
+        if (await isEmailTaken(email.trim()))
+          found.email = "An account with this email already exists";
+      } catch {
+        /* the real sign-up below reports a connection problem */
+      } finally {
+        setLoading(false);
+      }
+    }
+
     setErrors(found);
     if (Object.keys(found).length > 0) return; // every problem is already shown under its field
 

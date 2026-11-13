@@ -120,6 +120,15 @@ export async function restoreSession(): Promise<AuthUser | null> {
   }
 }
 
+/** Sign-up screen: is this email already used by another account? */
+export async function isEmailTaken(email: string): Promise<boolean> {
+  const res = await api<{ available: boolean }>("/auth/check-email", {
+    method: "POST",
+    body: { email },
+  });
+  return !res.available;
+}
+
 /** Change the display name of the signed-in user (PATCH /auth/me). */
 export async function updateName(fullName: string): Promise<AuthUser> {
   const me = await api<AuthUser>("/auth/me", {

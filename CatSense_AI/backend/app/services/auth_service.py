@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -37,3 +37,7 @@ def update_name(db: Session, user: User, full_name: str) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+def email_taken(db: Session, email: str) -> bool:
+    return db.scalar(select(User.id).where(func.lower(User.email) == email.strip().lower())) is not None

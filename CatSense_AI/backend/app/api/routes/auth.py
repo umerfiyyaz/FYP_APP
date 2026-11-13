@@ -5,7 +5,7 @@ from app.api.deps import get_current_user
 from app.core.security import create_access_token
 from app.db.models import User
 from app.db.session import get_db
-from app.schemas.profile import UserUpdate
+from app.schemas.profile import EmailCheckIn, UserUpdate
 from app.schemas.user import LoginIn, SignUpIn, TokenOut, UserOut
 from app.services import auth_service
 
@@ -23,6 +23,12 @@ def signup(data: SignUpIn, db: Session = Depends(get_db)) -> TokenOut:
     except auth_service.EmailTaken:
         raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists")
     return _token_for(user)
+
+
+@router.post("/check-email")
+def check_email(data: EmailCheckIn, db: Session = Depends(get_db)) -> dict[str, bool]:
+    """Is this email free? (the sign-up screen asks before the user presses the button twice)"""
+    return {"available": not auth_service.email_taken(db, data.email)}
 
 
 @router.post("/login", response_model=TokenOut)
