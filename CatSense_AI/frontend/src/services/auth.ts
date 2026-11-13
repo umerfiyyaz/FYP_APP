@@ -1,4 +1,5 @@
 // Talks to the backend for sign up / sign in and keeps the login token safe on the phone.
+import { useSyncExternalStore } from "react";
 import * as SecureStore from "expo-secure-store";
 
 import { api, ApiError, setAuthToken, USE_MOCK } from "@/services/api";
@@ -12,6 +13,17 @@ export type AuthUser = { id: string; email: string; full_name: string | null };
 type TokenOut = { access_token: string; token_type: string; user: AuthUser };
 
 let currentUser: AuthUser | null = null;
+const listeners = new Set<() => void>();
+function setUser(u: AuthUser | null) {
+  currentUser = u;
+  listeners.forEach((l) => l());
+}
+const subscribe = (l: () => void) => {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+};
 
 /** Forget the cats, results and alerts of the previous account. */
 function clearUserData() {
@@ -21,6 +33,9 @@ function clearUserData() {
 }
 /** The signed-in user (null in demo mode or before sign in). */
 export const getCurrentUser = () => currentUser;
+/** Same as getCurrentUser, but the screen redraws when the user (for example the name) changes. */
+export const useCurrentUser = () =>
+  useSyncExternalStore(subscribe, getCurrentUser, getCurrentUser);
 
 // ---- token storage (never crashes the app if secure storage is not available) ----
 async function saveToken(token: string) {
@@ -57,7 +72,7 @@ export async function signUp(
   });
   setAuthToken(res.access_token);
   await saveToken(res.access_token);
-  currentUser = res.user;
+  setUser(res.user);
   clearUserData(); // a new account has nothing yet
   return res.user;
 }
@@ -72,7 +87,7 @@ export async function signIn(
   });
   setAuthToken(res.access_token);
   await saveToken(res.access_token);
-  currentUser = res.user;
+  setUser(res.user);
   clearUserData();
   await catActions.hydrate(); // load this account's cats (results and alerts load per cat)
   return res.user;
@@ -80,7 +95,7 @@ export async function signIn(
 
 export async function signOut(): Promise<void> {
   setAuthToken(null);
-  currentUser = null;
+  setUser(null);
   await clearToken();
   if (!USE_MOCK) clearUserData(); // demo mode keeps its sample data
 }
@@ -92,9 +107,10 @@ export async function restoreSession(): Promise<AuthUser | null> {
   if (!token) return null;
   setAuthToken(token);
   try {
-    currentUser = await api<AuthUser>("/auth/me");
+    const me = await api<AuthUser>("/auth/me");
+    setUser(me);
     await catActions.hydrate();
-    return currentUser;
+    return me;
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {
       setAuthToken(null);
@@ -102,6 +118,16 @@ export async function restoreSession(): Promise<AuthUser | null> {
     }
     return null; // server not reachable: show login, keep the token for next time
   }
+}
+
+/** Change the display name of the signed-in user (PATCH /auth/me). */
+export async function updateName(fullName: string): Promise<AuthUser> {
+  const me = await api<AuthUser>("/auth/me", {
+    method: "PATCH",
+    body: { full_name: fullName },
+  });
+  setUser(me);
+  return me;
 }
 
 /** Turns any error into one short sentence for the user. */

@@ -5,6 +5,7 @@ from app.api.deps import get_current_user
 from app.core.security import create_access_token
 from app.db.models import User
 from app.db.session import get_db
+from app.schemas.profile import UserUpdate
 from app.schemas.user import LoginIn, SignUpIn, TokenOut, UserOut
 from app.services import auth_service
 
@@ -35,3 +36,8 @@ def login(data: LoginIn, db: Session = Depends(get_db)) -> TokenOut:
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)) -> User:
     return user
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(data: UserUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> User:
+    return auth_service.update_name(db, user, data.full_name)

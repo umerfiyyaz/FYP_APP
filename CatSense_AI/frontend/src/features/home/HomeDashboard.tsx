@@ -11,7 +11,7 @@ import { Tag } from "@/components/ui/Tag";
 import { images } from "@/constants/images";
 import { riskTone } from "@/components/charts/RiskGauge";
 import { useRemoveFlow } from "@/features/history/useRemoveFlow";
-import { getCurrentUser } from "@/services/auth";
+import { useCurrentUser } from "@/services/auth";
 import { useActiveCat } from "@/store/catStore";
 import {
   formatAgo,
@@ -64,7 +64,7 @@ export function HomeDashboard() {
   const { items: all } = useHistory();
   const cat = useActiveCat();
   const CAT_NAME = cat?.name ?? "Milo";
-  const user = getCurrentUser();
+  const user = useCurrentUser();
   const USER_NAME =
     user?.full_name?.trim().split(" ")[0] ||
     user?.email.split("@")[0] ||

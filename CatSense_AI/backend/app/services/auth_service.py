@@ -30,3 +30,10 @@ def authenticate(db: Session, data: LoginIn) -> User | None:
     if user is None or not verify_password(data.password, user.password_hash):
         return None
     return user
+
+
+def update_name(db: Session, user: User, full_name: str) -> User:
+    user.full_name = full_name
+    db.commit()
+    db.refresh(user)
+    return user

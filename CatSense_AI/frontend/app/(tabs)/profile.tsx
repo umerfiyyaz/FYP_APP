@@ -1,5 +1,13 @@
 import { useCallback, useState } from "react";
-import { Alert, ScrollView, Text, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 
@@ -9,7 +17,14 @@ import { BrandHeader } from "@/components/ui/BrandHeader";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Icon, IconName } from "@/components/ui/Icon";
 import { Toast } from "@/components/ui/Toast";
-import { getCurrentUser, signOut as clearSession } from "@/services/auth";
+import { USE_MOCK } from "@/services/api";
+import {
+  errorMessage,
+  signOut as clearSession,
+  updateName,
+  useCurrentUser,
+  type AuthUser,
+} from "@/services/auth";
 import { openAlertsOf, useAlerts } from "@/store/alertStore";
 import { ageText, catActions, useActiveCat, useCats } from "@/store/catStore";
 import { inPeriod, useHistory } from "@/store/historyStore";
@@ -21,8 +36,7 @@ import { pickPhotoUri } from "@/utils/pickPhoto";
 // Screen 18 - Profile (+ log-out sheet). File: app/(tabs)/profile.tsx
 // ---------------------------------------------------------------------------------------------
 
-const ownerName = () => {
-  const u = getCurrentUser();
+const ownerName = (u: AuthUser | null) => {
   return u?.full_name || u?.email.split("@")[0] || "Alex"; // "Alex" only in demo mode
 };
 
@@ -125,6 +139,11 @@ export default function ProfileScreen() {
   const { alerts } = useAlerts();
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const user = useCurrentUser();
+  const [nameOpen, setNameOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
   const clearToast = useCallback(() => setToast(null), []);
 
   if (!cat) return null;
@@ -151,6 +170,28 @@ export default function ProfileScreen() {
     router.replace("/(auth)/login" as never);
   };
   const soon = () => setToast("Coming soon");
+  const openName = () => {
+    setNameDraft(user?.full_name ?? "");
+    setNameError("");
+    setNameOpen(true);
+  };
+  const saveName = async () => {
+    const value = nameDraft.trim();
+    if (!value) {
+      setNameError("Please enter your name");
+      return;
+    }
+    setNameSaving(true);
+    try {
+      await updateName(value);
+      setNameOpen(false);
+      setToast("Name updated");
+    } catch (e) {
+      setNameError(errorMessage(e));
+    } finally {
+      setNameSaving(false);
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -240,7 +281,7 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            {`${ageText(cat.ageYears)}, ${cat.breed} • Owner: ${ownerName()}`}
+            {`${ageText(cat.ageYears)}, ${cat.breed} • Owner: ${ownerName(user)}`}
           </Text>
           <View
             style={{
@@ -439,6 +480,14 @@ export default function ProfileScreen() {
               Cloud Active
             </Text>
           </View>
+          {!USE_MOCK ? (
+            <SettingRow
+              icon="person"
+              title="Your name"
+              subtitle={user?.full_name || "Add your name"}
+              onPress={openName}
+            />
+          ) : null}
           <SettingRow
             icon="collections-bookmark"
             title="Cat profiles"
@@ -513,6 +562,100 @@ export default function ProfileScreen() {
         onConfirm={signOut}
         onCancel={() => setSignOutOpen(false)}
       />
+      <Modal
+        visible={nameOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNameOpen(false)}
+      >
+        <Pressable
+          onPress={() => !nameSaving && setNameOpen(false)}
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            padding: spacing.margin,
+            backgroundColor: "rgba(0,0,0,0.6)",
+          }}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              borderRadius: radius.lg,
+              padding: 20,
+              gap: 14,
+              backgroundColor: colors.surfaceContainerHigh,
+            }}
+          >
+            <Text style={[type.headlineSm, { color: colors.onSurface }]}>
+              Your name
+            </Text>
+            <TextInput
+              value={nameDraft}
+              onChangeText={(v) => {
+                setNameDraft(v);
+                setNameError("");
+              }}
+              placeholder="e.g. Umer"
+              placeholderTextColor={colors.onSurfaceVariant}
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={80}
+              autoFocus
+              style={[
+                type.bodyLg,
+                {
+                  color: colors.onSurface,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  borderRadius: radius.md,
+                  backgroundColor: colors.surfaceContainerLowest,
+                },
+              ]}
+            />
+            {nameError ? (
+              <Text style={[type.bodySm, { color: colors.error }]}>
+                {nameError}
+              </Text>
+            ) : null}
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <Pressable
+                onPress={() => setNameOpen(false)}
+                disabled={nameSaving}
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  paddingVertical: 13,
+                  borderRadius: radius.full,
+                  backgroundColor: withAlpha(
+                    colors.surfaceContainerHighest,
+                    0.8,
+                  ),
+                }}
+              >
+                <Text style={[type.labelLg, { color: colors.onSurface }]}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={saveName}
+                disabled={nameSaving}
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  paddingVertical: 13,
+                  borderRadius: radius.full,
+                  backgroundColor: colors.primary,
+                  opacity: nameSaving ? 0.6 : 1,
+                }}
+              >
+                <Text style={[type.labelLg, { color: colors.onPrimary }]}>
+                  {nameSaving ? "Saving..." : "Save"}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Toast message={toast} onDone={clearToast} />
     </View>
   );
