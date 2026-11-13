@@ -85,6 +85,9 @@ function stageFromPercent(p: number) {
   return "health_report";
 }
 
+/** 20 -> "20 s", 9.6 -> "9.6 s" (same rounding as the Trim screen) */
+const fmtSec = (s: number) => `${Math.round(s * 10) / 10} s`;
+
 type StepState = "done" | "running" | "waiting" | "queued";
 
 function StepRow({
@@ -332,6 +335,11 @@ export default function ProcessingScreen() {
       ? pendingNow.trimEnd - pendingNow.trimStart
       : pendingNow.durationSec
     : 0;
+  const wasTrimmed =
+    !!pendingNow &&
+    pendingNow.trimStart !== null &&
+    pendingNow.trimEnd !== null;
+  const originalSec = pendingNow?.durationSec ?? 0;
   const activeStage = USE_MOCK ? stageFromPercent(percent) : stage;
   const activeIdx = Math.max(
     0,
@@ -486,26 +494,54 @@ export default function ProcessingScreen() {
               : "This can take a little while. You can keep this screen open."}
           </Text>
 
-          {USE_MOCK || clipSec > 0 ? (
+          {pendingNow && clipSec > 0 ? (
+            <View style={styles.clipInfo}>
+              {wasTrimmed ? (
+                <>
+                  <View style={styles.analysedPill}>
+                    <Icon name="videocam" size={15} color={colors.secondary} />
+                    <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                      Video:{" "}
+                      <Text
+                        style={{ color: colors.primary, fontWeight: "700" }}
+                      >
+                        {fmtSec(originalSec)}
+                      </Text>
+                    </Text>
+                  </View>
+                  <View style={styles.analysedPill}>
+                    <Icon name="timer" size={15} color={colors.secondary} />
+                    <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                      Trimmed to:{" "}
+                      <Text
+                        style={{ color: colors.primary, fontWeight: "700" }}
+                      >
+                        {fmtSec(clipSec)}
+                      </Text>
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.analysedPill}>
+                  <Icon name="timer" size={15} color={colors.secondary} />
+                  <Text style={[type.labelMd, { color: colors.onSurface }]}>
+                    Video length:{" "}
+                    <Text style={{ color: colors.primary, fontWeight: "700" }}>
+                      {fmtSec(clipSec)}
+                    </Text>
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : USE_MOCK ? (
             <View style={styles.analysedPill}>
               <Icon name="timer" size={15} color={colors.secondary} />
               <Text style={[type.labelMd, { color: colors.onSurface }]}>
-                {USE_MOCK ? (
-                  <>
-                    Seconds analysed:{" "}
-                    <Text style={{ color: colors.primary, fontWeight: "700" }}>
-                      30
-                    </Text>{" "}
-                    of 48
-                  </>
-                ) : (
-                  <>
-                    Clip length:{" "}
-                    <Text style={{ color: colors.primary, fontWeight: "700" }}>
-                      {Math.round(clipSec)} s
-                    </Text>
-                  </>
-                )}
+                Seconds analysed:{" "}
+                <Text style={{ color: colors.primary, fontWeight: "700" }}>
+                  30
+                </Text>{" "}
+                of 48
               </Text>
             </View>
           ) : null}
@@ -795,6 +831,12 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     lineHeight: 22,
     marginBottom: 10,
+  },
+  clipInfo: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
   },
   analysedPill: {
     flexDirection: "row",
