@@ -13,6 +13,17 @@ def _clean_email(value: str) -> str:
     return value
 
 
+def check_password(v: str) -> str:
+    """The password rules, shared by sign up and password reset."""
+    if len(v) < 8:
+        raise ValueError("Password must contain at least 8 characters")
+    if len(v.encode("utf-8")) > 72:
+        raise ValueError("Password is too long (max 72 characters)")
+    if not any(c.isalpha() for c in v) or not any(c.isdigit() for c in v):
+        raise ValueError("Password must contain at least one letter and one number")
+    return v
+
+
 class SignUpIn(BaseModel):
     email: str
     password: str = Field(min_length=8)
@@ -26,11 +37,7 @@ class SignUpIn(BaseModel):
     @field_validator("password")
     @classmethod
     def password_ok(cls, v: str) -> str:
-        if len(v.encode("utf-8")) > 72:
-            raise ValueError("Password is too long (max 72 characters)")
-        if not any(c.isalpha() for c in v) or not any(c.isdigit() for c in v):
-            raise ValueError("Password must contain at least one letter and one number")
-        return v
+        return check_password(v)
 
     @field_validator("full_name")
     @classmethod
@@ -55,6 +62,7 @@ class UserOut(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str | None = None
+    email_verified: bool = False
 
 
 class TokenOut(BaseModel):

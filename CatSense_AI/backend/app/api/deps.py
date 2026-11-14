@@ -9,10 +9,11 @@ from app.db.session import get_db
 bearer = HTTPBearer(auto_error=False)
 
 
-def get_current_user(
+def get_current_user_any(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> User:
+    """The logged-in user, verified or not. Only the sign-up / verification routes use this one."""
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Not authenticated",
@@ -26,4 +27,11 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None:
         raise unauthorized
+    return user
+
+
+def get_current_user(user: User = Depends(get_current_user_any)) -> User:
+    """The logged-in user with a verified email. Every other route (cats, videos, results ...) uses this."""
+    if not user.email_verified:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Please verify your email first")
     return user

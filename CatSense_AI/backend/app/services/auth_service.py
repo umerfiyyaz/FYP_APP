@@ -41,3 +41,22 @@ def update_name(db: Session, user: User, full_name: str) -> User:
 
 def email_taken(db: Session, email: str) -> bool:
     return db.scalar(select(User.id).where(func.lower(User.email) == email.strip().lower())) is not None
+
+
+def find_by_email(db: Session, email: str) -> User | None:
+    return db.scalar(select(User).where(func.lower(User.email) == email.strip().lower()))
+
+
+def mark_verified(db: Session, user: User) -> User:
+    user.email_verified = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def set_password(db: Session, user: User, new_password: str) -> User:
+    user.password_hash = hash_password(new_password)
+    user.email_verified = True  # the code from the email proves the address is theirs
+    db.commit()
+    db.refresh(user)
+    return user
