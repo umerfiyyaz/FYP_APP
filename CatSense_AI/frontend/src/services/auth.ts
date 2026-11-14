@@ -9,7 +9,12 @@ import { historyActions } from "@/store/historyStore";
 
 const TOKEN_KEY = "catsense_token";
 
-export type AuthUser = { id: string; email: string; full_name: string | null };
+export type AuthUser = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  email_verified: boolean;
+};
 type TokenOut = { access_token: string; token_type: string; user: AuthUser };
 
 let currentUser: AuthUser | null = null;
@@ -119,6 +124,38 @@ export async function restoreSession(): Promise<AuthUser | null> {
     return null; // server not reachable: show login, keep the token for next time
   }
 }
+
+/** Sign up: type the 6 digit code that was emailed. The server marks the email as verified. */
+export async function verifyEmail(code: string): Promise<AuthUser> {
+  const me = await api<AuthUser>("/auth/verify-email", {
+    method: "POST",
+    body: { code },
+  });
+  setUser(me);
+  return me;
+}
+
+/** Send a new verification code (the server allows one per minute). */
+export const resendCode = () =>
+  api<{ ok: boolean }>("/auth/resend-code", { method: "POST" });
+
+/** Forgot password, step 1: email a reset code (the answer is "ok" even if the email has no account). */
+export const forgotPassword = (email: string) =>
+  api<{ ok: boolean }>("/auth/forgot-password", {
+    method: "POST",
+    body: { email },
+  });
+
+/** Forgot password, step 2: the code from the email plus the new password. */
+export const resetPassword = (
+  email: string,
+  code: string,
+  newPassword: string,
+) =>
+  api<{ ok: boolean }>("/auth/reset-password", {
+    method: "POST",
+    body: { email, code, new_password: newPassword },
+  });
 
 /** Sign-up screen: is this email already used by another account? */
 export async function isEmailTaken(email: string): Promise<boolean> {

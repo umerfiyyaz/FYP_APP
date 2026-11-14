@@ -118,10 +118,12 @@ export default function AddCatScreen() {
   };
 
   const goHome = () => router.replace("/(tabs)/home"); // TODO: Skip behaviour to be confirmed
+  // Right after sign up there is no earlier screen to go back to, so "back" then means "skip to Home".
+  const goBack = () => (router.canGoBack() ? router.back() : goHome());
 
   return (
     <Screen>
-      <OnboardingTopBar step={1} onBack={() => router.back()} onSkip={goHome} />
+      <OnboardingTopBar step={1} onBack={goBack} onSkip={goHome} />
       <StepProgress step={1} />
 
       {/* Main card */}
@@ -340,7 +342,7 @@ export default function AddCatScreen() {
               shadow={shadows.cancel}
               pressScale={0.95}
               style={{ flex: 1 }}
-              onPress={() => router.back()}
+              onPress={goBack}
             />
             <Button
               label="Save changes"

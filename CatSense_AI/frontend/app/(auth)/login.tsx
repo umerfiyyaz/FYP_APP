@@ -13,7 +13,13 @@ import { Screen } from "@/components/ui/Screen";
 import { DEMO_PREFILL } from "@/constants/config";
 import { images } from "@/constants/images";
 import { ApiError, USE_MOCK } from "@/services/api";
-import { errorMessage, isEmailTaken, signIn, signUp } from "@/services/auth";
+import {
+  errorMessage,
+  isEmailTaken,
+  resendCode,
+  signIn,
+  signUp,
+} from "@/services/auth";
 import {
   colors,
   gradients,
@@ -163,10 +169,16 @@ export default function LoginScreen() {
     try {
       if (mode === "register") {
         await signUp(email.trim(), password, fullName.trim() || undefined);
-        router.replace("/add-cat"); // new account -> onboarding step 1 (add your cat)
+        // new account: first the code that was emailed, then onboarding step 1 (add your cat)
+        router.push("/verify-email?next=add-cat" as never); // push: Back from add-cat returns here
       } else {
-        await signIn(email.trim(), password);
-        router.replace("/(tabs)/home");
+        const user = await signIn(email.trim(), password);
+        if (user.email_verified) {
+          router.replace("/(tabs)/home");
+        } else {
+          resendCode().catch(() => {}); // an old account that never entered its code
+          router.replace("/verify-email?next=home" as never);
+        }
       }
     } catch (e) {
       setErrors(serverErrors(e));
@@ -380,7 +392,12 @@ export default function LoginScreen() {
                 Password
               </Text>
               <Text
-                onPress={() => router.push("/forgot-password")}
+                onPress={() =>
+                  router.push({
+                    pathname: "/forgot-password",
+                    params: { email: email.trim() },
+                  } as never)
+                }
                 accessibilityRole="button"
                 style={[type.labelSm, { color: colors.primary }]}
               >

@@ -5,16 +5,22 @@ import { Redirect } from "expo-router";
 import { restoreSession } from "@/services/auth";
 import { colors } from "@/theme";
 
-// App start: a saved, valid login goes straight to Home, otherwise to the login screen.
+type Target = "/(tabs)/home" | "/(auth)/login" | "/verify-email?next=home";
+
+// App start: a saved, valid login goes straight to Home (or to the "enter your code" screen when the
+// email is not verified yet), otherwise to the login screen.
 export default function Index() {
-  const [target, setTarget] = useState<"/(tabs)/home" | "/(auth)/login" | null>(
-    null,
-  );
+  const [target, setTarget] = useState<Target | null>(null);
 
   useEffect(() => {
     let alive = true;
     restoreSession().then((user) => {
-      if (alive) setTarget(user ? "/(tabs)/home" : "/(auth)/login");
+      if (!alive) return;
+      if (!user) setTarget("/(auth)/login");
+      else
+        setTarget(
+          user.email_verified ? "/(tabs)/home" : "/verify-email?next=home",
+        );
     });
     return () => {
       alive = false;
@@ -35,5 +41,5 @@ export default function Index() {
       </View>
     );
   }
-  return <Redirect href={target} />;
+  return <Redirect href={target as never} />;
 }
